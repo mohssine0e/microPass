@@ -1,0 +1,36 @@
+# Maven build outputs
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE specific files
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.classpath
+.project
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# microPass local runtime data and sandboxed build workspaces
+data/
+*.db
+*.mv.db
+*.trace.db
+
+# OS / temporary files
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+
