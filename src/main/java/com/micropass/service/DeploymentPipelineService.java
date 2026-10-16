@@ -7,6 +7,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 @Service
@@ -20,6 +21,8 @@ public class DeploymentPipelineService {
     private final GitService gitService;
     private final DockerService dockerService;
     private final PortAllocationService portAllocationService;
+    private final LogStreamService logStreamService;
+    private final HealthCheckService healthCheckService;
 
     public DeploymentPipelineService(
             AppRepository appRepository,
@@ -27,13 +30,17 @@ public class DeploymentPipelineService {
             WorkspaceService workspaceService,
             GitService gitService,
             DockerService dockerService,
-            PortAllocationService portAllocationService) {
+            PortAllocationService portAllocationService,
+            LogStreamService logStreamService,
+            HealthCheckService healthCheckService) {
         this.appRepository = appRepository;
         this.deploymentRepository = deploymentRepository;
         this.workspaceService = workspaceService;
         this.gitService = gitService;
         this.dockerService = dockerService;
         this.portAllocationService = portAllocationService;
+        this.logStreamService = logStreamService;
+        this.healthCheckService = healthCheckService;
     }
 
     public Deployment triggerDeployment(Long appId) {
@@ -50,6 +57,16 @@ public class DeploymentPipelineService {
         runPipelineAsync(app.getId(), deployment.getId());
 
         return deployment;
+    }
+
+    public void stopApp(Long appId) {
+        App app = appRepository.findById(appId)
+                .orElseThrow(() -> new IllegalArgumentException("App not found: " + appId));
+
+        String containerName = "micropass-" + app.getName();
+        dockerService.stopAndRemoveContainer(containerName, null);
+        app.setActiveContainerId(null);
+        appRepository.save(app);
     }
 
     @Async
@@ -106,7 +123,7 @@ public class DeploymentPipelineService {
             deploymentRepository.save(deployment);
 
             int hostPort = portAllocationService.allocatePort(app);
-            int containerPort = 80; // Standard container HTTP port for sample apps
+            int containerPort = 80;
 
             String containerName = "micropass-" + app.getName();
             DockerService.DockerRunResult runResult = dockerService.runContainer(
@@ -121,9 +138,18 @@ public class DeploymentPipelineService {
                 throw new RuntimeException("Container launch failed: " + runResult.logs());
             }
 
-            // Step 5: Mark Healthy
             deployment.setContainerId(runResult.containerId());
             deployment.setPort(hostPort);
+
+            // Step 5: Health Check Probe
+            autoLog(deployment, logBuffer, "Probing container health at http://localhost:" + hostPort + "/ ...");
+            boolean isHealthy = healthCheckService.waitForHealthy(hostPort, 10, Duration.ofMillis(1000));
+
+            if (!isHealthy) {
+                throw new RuntimeException("Container failed health check probe within 10 seconds.");
+            }
+
+            autoLog(deployment, logBuffer, "Container health check PASSED.");
             deployment.setStatus(DeploymentStatus.HEALTHY);
             deployment.setFinishedAt(LocalDateTime.now());
             deployment.setBuildLogs(logBuffer.toString());
@@ -142,12 +168,14 @@ public class DeploymentPipelineService {
             deployment.setFinishedAt(LocalDateTime.now());
             deployment.setBuildLogs(logBuffer.toString());
             deploymentRepository.save(deployment);
+        } finally {
+            logStreamService.complete(deployment.getId());
         }
     }
 
     private void autoLog(Deployment deployment, StringBuilder logBuffer, String message) {
         log.info(message);
         logBuffer.append(message).append("\n");
+        logStreamService.broadcast(deployment.getId(), message);
     }
 }
-

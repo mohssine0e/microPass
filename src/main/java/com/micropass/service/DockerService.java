@@ -77,8 +77,15 @@ public class DockerService {
         List<String> stopCmd = List.of("docker", "rm", "-f", containerNameOrId);
         CommandExecutor.ExecutionResult result = CommandExecutor.execute(stopCmd, null, null);
         if (result.exitCode() == 0 && logConsumer != null) {
-            logConsumer.accept("Cleaned up previous container: " + containerNameOrId);
+            logConsumer.accept("Cleaned up container: " + containerNameOrId);
         }
+    }
+
+    public boolean isContainerRunning(String containerNameOrId) {
+        if (containerNameOrId == null || containerNameOrId.isBlank()) return false;
+        List<String> inspectCmd = List.of("docker", "inspect", "-f", "{{.State.Running}}", containerNameOrId);
+        CommandExecutor.ExecutionResult result = CommandExecutor.execute(inspectCmd, null, null);
+        return result.exitCode() == 0 && result.output().trim().equalsIgnoreCase("true");
     }
 }
 
