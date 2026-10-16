@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>microPass - Application Deployment Platform</title>
+    <!-- Tailwind CSS (via official modern CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- HTMX for reactive AJAX swapping -->
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <!-- HTMX Server-Sent Events extension -->
+    <script src="https://unpkg.com/htmx.org@1.9.12/dist/ext/sse.js"></script>
+    <style>
+        .terminal-scroll::-webkit-scrollbar { width: 6px; }
+        .terminal-scroll::-webkit-scrollbar-track { background: #0f172a; }
+        .terminal-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased flex flex-col">
+
+    <!-- Top Navigation -->
+    <header class="border-b border-slate-800 bg-slate-900/60 backdrop-blur sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="h-9 w-9 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/30">
+                    μP
+                </div>
+                <span class="text-xl font-bold tracking-tight text-white">microPass</span>
+                <span class="text-xs bg-slate-800 text-slate-400 font-medium px-2 py-0.5 rounded-full border border-slate-700">Self-Hosted PaaS</span>
+            </div>
+            <div class="flex items-center space-x-4 text-sm text-slate-400">
+                <span class="flex items-center gap-1.5">
+                    <span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Docker Connected
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+        <!-- Top Row: Welcome & Register App Form -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- App Registration Card -->
+            <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-6 shadow-sm">
+                <h2 class="text-lg font-semibold text-white mb-1 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    New Application
+                </h2>
+                <p class="text-xs text-slate-400 mb-5">Connect a Git repository with a Dockerfile to deploy automatically.</p>
+
+                <form hx-post="/ui/apps" hx-target="#apps-table-container" hx-swap="outerHTML" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Application Name</label>
+                        <input type="text" name="name" required placeholder="e.g. sample-app"
+                               class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"/>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Git Repository (Local Path or URL)</label>
+                        <input type="text" name="gitUrl" required placeholder="/path/to/repo or https://github.com/..."
+                               class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"/>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Default Branch</label>
+                        <input type="text" name="defaultBranch" value="main"
+                               class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"/>
+                    </div>
+                    <button type="submit" 
+                            class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 px-4 rounded-lg text-sm shadow transition shadow-indigo-600/30">
+                        Register Project
+                    </button>
+                </form>
+            </div>
+
+            <!-- Platform Metrics & Information -->
+            <div class="lg:col-span-2 bg-slate-900/40 border border-slate-800/80 rounded-xl p-6 flex flex-col justify-between">
+                <div>
+                    <h3 class="text-base font-semibold text-slate-200 mb-2">Zero-Cost Self-Hosted PaaS Engine</h3>
+                    <p class="text-sm text-slate-400 leading-relaxed mb-4">
+                        microPass continuously manages local isolated workspace directories, executes Docker packaging pipelines, manages host port mappings to prevent collisions, and verifies deployment readiness using active health probes.
+                    </p>
+                </div>
+                <div class="grid grid-cols-3 gap-4 pt-4 border-t border-slate-800/60">
+                    <div class="bg-slate-950/60 p-3 rounded-lg border border-slate-800">
+                        <div class="text-xs text-slate-400">Runtime Engine</div>
+                        <div class="text-sm font-semibold text-slate-200 mt-0.5">Java 21 Loom</div>
+                    </div>
+                    <div class="bg-slate-950/60 p-3 rounded-lg border border-slate-800">
+                        <div class="text-xs text-slate-400">Container Daemon</div>
+                        <div class="text-sm font-semibold text-slate-200 mt-0.5">Docker Engine</div>
+                    </div>
+                    <div class="bg-slate-950/60 p-3 rounded-lg border border-slate-800">
+                        <div class="text-xs text-slate-400">Log Protocol</div>
+                        <div class="text-sm font-semibold text-slate-200 mt-0.5">Server-Sent Events</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Applications Table & Real-Time Controls -->
+        <div id="apps-table-container" th:fragment="appsTable" class="bg-slate-900/90 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+            <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+                <div>
+                    <h3 class="font-semibold text-white">Registered Applications</h3>
+                    <p class="text-xs text-slate-400">List of applications managed by microPass on this machine</p>
+                </div>
+                <button hx-get="/ui/apps/table" hx-target="#apps-table-container" hx-swap="outerHTML"
+                        class="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    Refresh
+                </button>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm text-slate-300">
+                    <thead class="bg-slate-950 text-xs uppercase text-slate-400 border-b border-slate-800">
+                        <tr>
+                            <th class="px-6 py-3 font-semibold">Application</th>
+                            <th class="px-6 py-3 font-semibold">Git Repository</th>
+                            <th class="px-6 py-3 font-semibold">Port Mapping</th>
+                            <th class="px-6 py-3 font-semibold">Status</th>
+                            <th class="px-6 py-3 font-semibold text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60">
+                        <tr th:if="${#lists.isEmpty(apps)}">
+                            <td colspan="5" class="px-6 py-8 text-center text-slate-500">
+                                No applications registered yet. Add your first app above!
+                            </td>
+                        </tr>
+                        <tr th:each="app : ${apps}" class="hover:bg-slate-800/30 transition">
+                            <td class="px-6 py-4 font-medium text-white flex items-center gap-2">
+                                <span class="h-2 w-2 rounded-full" 
+                                      th:classappend="${app.activeContainerId != null ? 'bg-emerald-500' : 'bg-slate-600'}"></span>
+                                <span th:text="${app.name}">app-name</span>
+                            </td>
+                            <td class="px-6 py-4 font-mono text-xs text-slate-400 truncate max-w-xs" th:text="${app.gitUrl}">
+                                /path/to/repo
+                            </td>
+                            <td class="px-6 py-4">
+                                <span th:if="${app.allocatedPort != null}">
+                                    <a th:href="@{'http://localhost:' + ${app.allocatedPort}}" target="_blank"
+                                       class="font-mono text-xs bg-slate-950 text-indigo-400 hover:text-indigo-300 px-2.5 py-1 rounded border border-slate-800 hover:border-indigo-500 transition inline-flex items-center gap-1">
+                                        localhost:<span th:text="${app.allocatedPort}">9100</span>
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                                    </a>
+                                </span>
+                                <span th:unless="${app.allocatedPort != null}" class="text-xs text-slate-500">Unassigned</span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <span th:if="${app.activeContainerId != null}" 
+                                      class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-950 text-emerald-400 border border-emerald-800/60">
+                                    Running
+                                </span>
+                                <span th:unless="${app.activeContainerId != null}" 
+                                      class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700">
+                                    Stopped
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-right space-x-2">
+                                <button th:onclick="'openDeploymentModal(' + ${app.id} + ')'"
+                                        class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg shadow transition">
+                                    Deploy Now
+                                </button>
+                                <button th:if="${app.activeContainerId != null}"
+                                        th:hx-post="@{'/ui/apps/' + ${app.id} + '/stop'}"
+                                        hx-target="#apps-table-container"
+                                        hx-swap="outerHTML"
+                                        class="bg-slate-800 hover:bg-rose-900/50 hover:text-rose-300 text-slate-300 text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-700 transition">
+                                    Stop
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Terminal & Deployment Log Viewer (Modal / Overlay) -->
+        <div id="terminal-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col h-[75vh]">
+                
+                <!-- Terminal Header -->
+                <div class="bg-slate-950 px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <div class="h-3 w-3 rounded-full bg-rose-500"></div>
+                        <div class="h-3 w-3 rounded-full bg-amber-500"></div>
+                        <div class="h-3 w-3 rounded-full bg-emerald-500"></div>
+                        <span id="terminal-title" class="ml-2 text-xs font-mono text-slate-400">microPass Build & Deploy Console</span>
+                    </div>
+                    <button onclick="closeDeploymentModal()" class="text-slate-400 hover:text-white text-sm font-bold transition">
+                        ✕
+                    </button>
+                </div>
+
+                <!-- Terminal Output Window -->
+                <div id="terminal-output" class="flex-1 p-4 bg-slate-950 text-slate-300 font-mono text-xs overflow-y-auto terminal-scroll whitespace-pre-wrap leading-relaxed select-text">
+                    <div class="text-slate-500">Connecting to live build stream...</div>
+                </div>
+
+                <!-- Terminal Footer Status -->
+                <div class="bg-slate-950 px-4 py-2 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                    <span id="terminal-status" class="flex items-center gap-2">
+                        <span class="h-2 w-2 rounded-full bg-indigo-500 animate-ping"></span>
+                        Streaming live Server-Sent Events...
+                    </span>
+                    <button onclick="closeDeploymentModal()" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded text-xs transition">
+                        Close & View Dashboard
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800/80 py-4 text-center text-xs text-slate-500">
+        microPass Modular Monolith • Java 21 Spring Boot 3 & Docker • Arch Linux
+    </footer>
+
+    <!-- Interactive Scripts for SSE and Modals -->
+    <script>
+        let currentEventSource = null;
+
+        function openDeploymentModal(appId) {
+            const modal = document.getElementById('terminal-modal');
+            const output = document.getElementById('terminal-output');
+            const status = document.getElementById('terminal-status');
+            
+            output.innerHTML = '<div class="text-slate-500">Initiating deployment pipeline...</div>';
+            status.innerHTML = '<span class="h-2 w-2 rounded-full bg-indigo-500 animate-ping"></span> Queuing deployment...';
+            modal.classList.remove('hidden');
+
+            // Trigger deploy via API
+            fetch('/api/apps/' + appId + '/deploy', { method: 'POST' })
+                .then(res => res.json())
+                .then(deployment => {
+                    output.innerHTML = '<div class="text-indigo-400">Connected to deployment #' + deployment.id + '</div>\n';
+                    listenToLogs(deployment.id);
+                })
+                .catch(err => {
+                    output.innerHTML += '<div class="text-rose-500">Failed to trigger deploy: ' + err + '</div>';
+                });
+        }
+
+        function listenToLogs(deploymentId) {
+            if (currentEventSource) {
+                currentEventSource.close();
+            }
+
+            const output = document.getElementById('terminal-output');
+            const status = document.getElementById('terminal-status');
+
+            currentEventSource = new EventSource('/api/deployments/' + deploymentId + '/logs/stream');
+
+            currentEventSource.onmessage = function(e) {
+                const line = document.createElement('div');
+                const text = e.data;
+                line.textContent = text;
+                
+                if (text.includes('[ERROR]') || text.includes('failed')) {
+                    line.className = 'text-rose-400 font-semibold';
+                } else if (text.includes('SUCCESS') || text.includes('PASSED')) {
+                    line.className = 'text-emerald-400 font-semibold';
+                } else if (text.includes('[DOCKER-BUILD]')) {
+                    line.className = 'text-sky-300';
+                } else if (text.includes('[GIT]')) {
+                    line.className = 'text-amber-300';
+                }
+                
+                output.appendChild(line);
+                output.scrollTop = output.scrollHeight;
+
+                if (text.includes('Deployment SUCCESS')) {
+                    status.innerHTML = '<span class="h-2 w-2 rounded-full bg-emerald-500"></span> Deployment Finished (HEALTHY)';
+                } else if (text.includes('[ERROR]')) {
+                    status.innerHTML = '<span class="h-2 w-2 rounded-full bg-rose-500"></span> Deployment Failed';
+                }
+            };
+
+            currentEventSource.onerror = function() {
+                // Stream ended cleanly or connection closed
+                currentEventSource.close();
+                currentEventSource = null;
+            };
+        }
+
+        function closeDeploymentModal() {
+            if (currentEventSource) {
+                currentEventSource.close();
+                currentEventSource = null;
+            }
+            document.getElementById('terminal-modal').classList.add('hidden');
+            // Refresh table
+            htmx.ajax('GET', '/ui/apps/table', { target: '#apps-table-container', swap: 'outerHTML' });
+        }
+    </script>
+</body>
+</html>
+
