@@ -18,30 +18,39 @@ public class DockerService {
     public record DockerBuildResult(boolean success, String imageTag, String logs) {}
     public record DockerRunResult(boolean success, String containerId, String logs) {}
 
-    public DockerBuildResult buildImage(Path projectDir, String imageName, String tag, Consumer<String> logConsumer) {
+    public DockerBuildResult buildImage(Path projectDir, String dockerfileRelPath, String imageName, String tag, 
+                                        Consumer<String> logConsumer, java.util.concurrent.atomic.AtomicBoolean cancellationFlag,
+                                        java.util.concurrent.atomic.AtomicReference<Process> processRef) {
         String fullTag = imageName.toLowerCase() + ":" + tag;
-        logConsumer.accept("Building Docker image: " + fullTag);
+        String relPath = (dockerfileRelPath == null || dockerfileRelPath.isBlank()) ? "Dockerfile" : dockerfileRelPath.trim();
+        Path dockerfile = projectDir.resolve(relPath);
 
-        Path dockerfile = projectDir.resolve("Dockerfile");
+        logConsumer.accept(">>> STEP 2/5: Packaging application into Docker image...");
+        logConsumer.accept(">>> Target Image Tag: " + fullTag);
+        logConsumer.accept(">>> Using Dockerfile: " + dockerfile.toAbsolutePath());
+
         if (!Files.exists(dockerfile)) {
-            String err = "No Dockerfile found in repository root: " + projectDir;
+            String err = "[ERROR] Dockerfile not found at: " + relPath + " (Checked full path: " + dockerfile.toAbsolutePath() + ")";
             logConsumer.accept(err);
             return new DockerBuildResult(false, null, err);
         }
 
         List<String> buildCmd = List.of(
                 "docker", "build",
+                "-f", dockerfile.toAbsolutePath().toString(),
                 "-t", fullTag,
                 projectDir.toAbsolutePath().toString()
         );
 
-        CommandExecutor.ExecutionResult result = CommandExecutor.execute(buildCmd, projectDir.toFile(), logConsumer);
+        CommandExecutor.ExecutionResult result = CommandExecutor.execute(
+                buildCmd, projectDir.toFile(), logConsumer, 15, java.util.concurrent.TimeUnit.MINUTES, cancellationFlag, processRef);
+        
         if (result.exitCode() != 0) {
-            logConsumer.accept("Docker build failed with exit code " + result.exitCode());
+            logConsumer.accept("[ERROR] Docker build failed with exit code: " + result.exitCode());
             return new DockerBuildResult(false, null, result.output());
         }
 
-        logConsumer.accept("Docker image built successfully: " + fullTag);
+        logConsumer.accept(">>> Docker image built and tagged successfully: [" + fullTag + "]");
         return new DockerBuildResult(true, fullTag, result.output());
     }
 

@@ -19,7 +19,7 @@ public class HealthCheckService {
             .connectTimeout(Duration.ofSeconds(2))
             .build();
 
-    public boolean waitForHealthy(int port, int maxAttempts, Duration delayBetweenAttempts) {
+    public boolean waitForHealthy(int port, int maxAttempts, Duration delayBetweenAttempts, java.util.function.Consumer<String> logConsumer) {
         String url = "http://localhost:" + port + "/";
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -29,13 +29,20 @@ public class HealthCheckService {
 
         for (int i = 1; i <= maxAttempts; i++) {
             try {
+                if (logConsumer != null) {
+                    logConsumer.accept(">>> Readiness probe (" + i + "/" + maxAttempts + "): Pinging " + url + " ...");
+                }
                 HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
-                // Any HTTP response (2xx, 3xx, 4xx, 5xx) proves the container socket is alive
-                // and responding
                 log.info("Health check attempt {} succeeded with HTTP status {}", i, response.statusCode());
+                if (logConsumer != null) {
+                    logConsumer.accept(">>> Readiness probe PASSED! HTTP " + response.statusCode() + " response from container.");
+                }
                 return true;
             } catch (Exception e) {
                 log.debug("Health check attempt {} failed: {}", i, e.getMessage());
+                if (logConsumer != null) {
+                    logConsumer.accept(">>> Readiness probe (" + i + "/" + maxAttempts + "): Container still warming up...");
+                }
                 try {
                     Thread.sleep(delayBetweenAttempts.toMillis());
                 } catch (InterruptedException ie) {
@@ -45,5 +52,9 @@ public class HealthCheckService {
             }
         }
         return false;
+    }
+
+    public boolean waitForHealthy(int port, int maxAttempts, Duration delayBetweenAttempts) {
+        return waitForHealthy(port, maxAttempts, delayBetweenAttempts, null);
     }
 }

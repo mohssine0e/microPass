@@ -7,5 +7,6 @@ public enum DeploymentStatus {
     DEPLOYING,
     HEALTHY,
     FAILED,
+    CANCELLED,
     STOPPED
 }

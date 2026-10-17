@@ -11,13 +11,12 @@ public class Deployment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @ManyToOne(optional = false, fetch = FetchType.EAGER)
     @JoinColumn(name = "app_id")
     private App app;
 
-    @Enumerated(EnumType.STRING) // this annotation specifies that the enum should be stored as a string in the
-                                 // database
-    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32, columnDefinition = "varchar(32)")
     private DeploymentStatus status;
 
     @Column

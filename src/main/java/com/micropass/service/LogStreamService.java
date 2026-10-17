@@ -20,7 +20,10 @@ public class LogStreamService {
     // deploymentId -> List of active client emitters
     private final Map<Long, List<SseEmitter>> emittersMap = new ConcurrentHashMap<>();
 
-    public SseEmitter subscribe(Long deploymentId, String historicalLogs) {
+    // deploymentId -> List of accumulated active logs in memory (prevents losing logs before SSE connects)
+    private final Map<Long, List<String>> activeLogsMap = new ConcurrentHashMap<>();
+
+    public SseEmitter subscribe(Long deploymentId, String historicalLogs, boolean isTerminal) {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT); // long-lived HTTP connection which allows the server to push logs to the client in real-time
 
         emittersMap.computeIfAbsent(deploymentId, k -> new CopyOnWriteArrayList<>()).add(emitter);
@@ -29,22 +32,72 @@ public class LogStreamService {
         emitter.onTimeout(() -> removeEmitter(deploymentId, emitter));
         emitter.onError(e -> removeEmitter(deploymentId, emitter));
 
-        // Replay any historical logs recorded so far before connection
-        if (historicalLogs != null && !historicalLogs.isBlank()) {
-            for (String line : historicalLogs.split("\n")) {
+        // Flush HTTP headers and establish connection immediately
+        try {
+            synchronized (emitter) {
+                emitter.send(SseEmitter.event().data(">>> Connected to deployment live stream"));
+            }
+        } catch (Exception ignored) {
+        }
+
+        // 1. Replay active logs accumulated in memory first (for in-progress deployments)
+        List<String> activeLogs = activeLogsMap.get(deploymentId);
+        if (activeLogs != null && !activeLogs.isEmpty()) {
+            for (String line : activeLogs) {
                 try {
-                    emitter.send(SseEmitter.event().data(line));
+                    synchronized (emitter) {
+                        emitter.send(SseEmitter.event().data(line));
+                    }
                 } catch (IOException e) {
+                    try {
+                        emitter.completeWithError(e);
+                    } catch (Exception ignored) {
+                    }
                     removeEmitter(deploymentId, emitter);
-                    break;
+                    return emitter;
                 }
             }
+        } else if (historicalLogs != null && !historicalLogs.isBlank()) {
+            // 2. Replay historical logs from database (for past completed deployments)
+            for (String line : historicalLogs.split("\n")) {
+                try {
+                    synchronized (emitter) {
+                        emitter.send(SseEmitter.event().data(line));
+                    }
+                } catch (IOException e) {
+                    try {
+                        emitter.completeWithError(e);
+                    } catch (Exception ignored) {
+                    }
+                    removeEmitter(deploymentId, emitter);
+                    return emitter;
+                }
+            }
+        }
+
+        if (isTerminal) {
+            try {
+                synchronized (emitter) {
+                    emitter.complete();
+                }
+            } catch (Exception ignored) {
+            }
+            removeEmitter(deploymentId, emitter);
         }
 
         return emitter;
     }
 
+    public SseEmitter subscribe(Long deploymentId, String historicalLogs) {
+        return subscribe(deploymentId, historicalLogs, false);
+    }
+
     public void broadcast(Long deploymentId, String logLine) {
+        if (logLine == null) return;
+
+        // Store into memory buffer so any late-connecting SSE subscriber gets full history
+        activeLogsMap.computeIfAbsent(deploymentId, k -> new CopyOnWriteArrayList<>()).add(logLine);
+
         List<SseEmitter> emitters = emittersMap.get(deploymentId);
         if (emitters == null || emitters.isEmpty()) {
             return;
@@ -52,8 +105,14 @@ public class LogStreamService {
 
         for (SseEmitter emitter : emitters) {
             try {
-                emitter.send(SseEmitter.event().data(logLine));
+                synchronized (emitter) {
+                    emitter.send(SseEmitter.event().data(logLine));
+                }
             } catch (Exception e) {
+                try {
+                    emitter.completeWithError(e);
+                } catch (Exception ignored) {
+                }
                 removeEmitter(deploymentId, emitter);
             }
         }
@@ -64,7 +123,9 @@ public class LogStreamService {
         if (emitters != null) {
             for (SseEmitter emitter : emitters) {
                 try {
-                    emitter.complete();
+                    synchronized (emitter) {
+                        emitter.complete();
+                    }
                 } catch (Exception ignored) {
                 }
             }

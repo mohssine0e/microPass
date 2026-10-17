@@ -43,6 +43,11 @@ public class WorkspaceService { // This service is responsible for managing the 
         }
     }
 
+    public void cleanWorkspace(Long appId, Long deploymentId) {
+        Path deploymentDir = baseWorkspaceDir.resolve("app-" + appId).resolve("deployment-" + deploymentId);
+        cleanDirectory(deploymentDir);
+    }
+
     public void cleanDirectory(Path path) {
         try {
             if (Files.exists(path)) {

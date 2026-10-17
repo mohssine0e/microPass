@@ -62,15 +62,25 @@ public class AppController {
     }
 
     @PostMapping("/apps/{id}/deploy")
-    public ResponseEntity<Deployment> triggerDeploy(@PathVariable Long id) {
+    public ResponseEntity<DeploymentResponse> triggerDeploy(@PathVariable Long id) {
         Deployment deployment = pipelineService.triggerDeployment(id);
-        return ResponseEntity.accepted().body(deployment);
+        return ResponseEntity.accepted().body(toResponse(deployment));
     }
 
     @PostMapping("/apps/{id}/stop")
     public ResponseEntity<Map<String, String>> stopApp(@PathVariable Long id) {
         pipelineService.stopApp(id);
         return ResponseEntity.ok(Map.of("message", "Application stopped successfully"));
+    }
+
+    @PostMapping("/deployments/{id}/cancel")
+    public ResponseEntity<Map<String, Object>> cancelDeployment(@PathVariable Long id) {
+        boolean cancelled = pipelineService.cancelDeployment(id);
+        return ResponseEntity.ok(Map.of(
+                "deploymentId", id,
+                "cancelled", cancelled,
+                "message", cancelled ? "Cancellation signal sent" : "Deployment is not currently active"
+        ));
     }
 
     @GetMapping("/apps/{id}/status")
@@ -88,10 +98,25 @@ public class AppController {
     }
 
     @GetMapping("/deployments/{id}")
-    public ResponseEntity<Deployment> getDeployment(@PathVariable Long id) {
+    public ResponseEntity<DeploymentResponse> getDeployment(@PathVariable Long id) {
         return deploymentRepository.findById(id)
-                .map(ResponseEntity::ok)
+                .map(d -> ResponseEntity.ok(toResponse(d)))
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    private DeploymentResponse toResponse(Deployment d) {
+        return new DeploymentResponse(
+                d.getId(),
+                d.getApp() != null ? d.getApp().getId() : null,
+                d.getApp() != null ? d.getApp().getName() : null,
+                d.getStatus(),
+                d.getCommitHash(),
+                d.getImageTag(),
+                d.getContainerId(),
+                d.getPort(),
+                d.getStartedAt(),
+                d.getFinishedAt()
+        );
     }
 
     @GetMapping(value = "/deployments/{id}/logs/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -99,6 +124,12 @@ public class AppController {
         Deployment deployment = deploymentRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Deployment not found: " + id));
 
-        return logStreamService.subscribe(id, deployment.getBuildLogs());
+        boolean isTerminal = deployment.getFinishedAt() != null ||
+                deployment.getStatus() == com.micropass.domain.DeploymentStatus.HEALTHY ||
+                deployment.getStatus() == com.micropass.domain.DeploymentStatus.FAILED ||
+                deployment.getStatus() == com.micropass.domain.DeploymentStatus.CANCELLED ||
+                deployment.getStatus() == com.micropass.domain.DeploymentStatus.STOPPED;
+
+        return logStreamService.subscribe(id, deployment.getBuildLogs(), isTerminal);
     }
 }
