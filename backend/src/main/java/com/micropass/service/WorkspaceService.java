@@ -31,30 +31,42 @@ public class WorkspaceService { // This service is responsible for managing the 
     }
 
     public Path prepareWorkspace(Long appId, Long deploymentId) {
-        Path deploymentDir = baseWorkspaceDir.resolve("app-" + appId).resolve("deployment-" + deploymentId);
+        return prepareAppWorkspace(appId);
+    }
+
+    public Path prepareAppWorkspace(Long appId) {
+        Path appSourceDir = baseWorkspaceDir.resolve("app-" + appId).resolve("source");
         try {
-            if (Files.exists(deploymentDir)) {
-                cleanDirectory(deploymentDir);
-            }
-            Files.createDirectories(deploymentDir);
-            return deploymentDir;
+            Files.createDirectories(appSourceDir);
+            return appSourceDir;
         } catch (IOException e) {
-            throw new RuntimeException("Failed to prepare workspace directory: " + deploymentDir, e);
+            throw new RuntimeException("Failed to prepare app workspace directory: " + appSourceDir, e);
         }
     }
 
+    public Path getAppSourceDir(Long appId) {
+        return baseWorkspaceDir.resolve("app-" + appId).resolve("source");
+    }
+
     public void cleanWorkspace(Long appId, Long deploymentId) {
-        Path deploymentDir = baseWorkspaceDir.resolve("app-" + appId).resolve("deployment-" + deploymentId);
-        cleanDirectory(deploymentDir);
+        // Retain the app repository cache so future builds perform sub-second incremental fetches!
+        // To clean entire app on deletion, call cleanAppWorkspace(appId).
+        log.debug("Preserving app repository cache for app #{}", appId);
+    }
+
+    public void cleanAppWorkspace(Long appId) {
+        Path appDir = baseWorkspaceDir.resolve("app-" + appId);
+        cleanDirectory(appDir);
     }
 
     public void cleanDirectory(Path path) {
         try {
             if (Files.exists(path)) {
-                Files.walk(path)
-                        .sorted(Comparator.reverseOrder())
-                        .map(Path::toFile)
-                        .forEach(File::delete);
+                try (var stream = Files.walk(path)) {
+                    stream.sorted(Comparator.reverseOrder())
+                            .map(Path::toFile)
+                            .forEach(File::delete);
+                }
             }
         } catch (Exception e) {
             log.warn("Could not completely clean directory {}: {}", path, e.getMessage());

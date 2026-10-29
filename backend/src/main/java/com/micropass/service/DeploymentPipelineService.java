@@ -149,6 +149,17 @@ public class DeploymentPipelineService {
         appRepository.save(app);
     }
 
+    public void deleteApp(Long appId) {
+        App app = appRepository.findById(appId)
+                .orElseThrow(() -> new IllegalArgumentException("App not found: " + appId));
+
+        stopApp(appId);
+        workspaceService.cleanAppWorkspace(appId);
+        deploymentRepository.findByAppIdOrderByIdDesc(appId)
+                .forEach(deploymentRepository::delete);
+        appRepository.delete(app);
+    }
+
     public void runPipeline(Long appId, Long deploymentId) {
         App app = appRepository.findById(appId).orElseThrow();
         Deployment deployment = deploymentRepository.findById(deploymentId).orElseThrow();
@@ -182,6 +193,7 @@ public class DeploymentPipelineService {
                     processRef);
 
             if (!gitResult.success()) {
+                checkCancelled(cancellationFlag);
                 throw new RuntimeException("Git clone failed: " + gitResult.errorOutput());
             }
 
@@ -204,6 +216,7 @@ public class DeploymentPipelineService {
                     processRef);
 
             if (!buildResult.success()) {
+                checkCancelled(cancellationFlag);
                 throw new RuntimeException("Docker build failed: " + buildResult.logs());
             }
 
@@ -231,6 +244,7 @@ public class DeploymentPipelineService {
                     line -> autoLog(deployment, logBuffer, "[DOCKER-RUN] " + line));
 
             if (!runResult.success()) {
+                checkCancelled(cancellationFlag);
                 throw new RuntimeException("Container launch failed: " + runResult.logs());
             }
 
@@ -245,6 +259,8 @@ public class DeploymentPipelineService {
                     line -> autoLog(deployment, logBuffer, line));
 
             if (!isHealthy) {
+                checkCancelled(cancellationFlag);
+                dockerService.stopAndRemoveContainer("micropass-" + app.getName(), null);
                 throw new RuntimeException("Container failed health check probe within 12 seconds.");
             }
 
@@ -264,7 +280,7 @@ public class DeploymentPipelineService {
 
         } catch (Exception e) {
             boolean isUserCancel = (cancellationFlag != null && cancellationFlag.get())
-                    || (e.getMessage() != null && e.getMessage().toLowerCase().contains("cancel"));
+                    || (e instanceof DeploymentCancelledException);
 
             if (isUserCancel) {
                 log.info("Deployment #{} was cancelled by user.", deploymentId);
@@ -288,9 +304,15 @@ public class DeploymentPipelineService {
         }
     }
 
+    public static class DeploymentCancelledException extends RuntimeException {
+        public DeploymentCancelledException() {
+            super("Deployment was cancelled by user.");
+        }
+    }
+
     private void checkCancelled(AtomicBoolean cancellationFlag) {
         if (cancellationFlag != null && cancellationFlag.get()) {
-            throw new RuntimeException("Deployment cancelled by user.");
+            throw new DeploymentCancelledException();
         }
     }
 

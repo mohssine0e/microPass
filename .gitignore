@@ -1,5 +1,9 @@
-# Maven build outputs
+# Maven & Java build outputs
 target/
+**/target/
+*.class
+*.jar
+*.war
 pom.xml.tag
 pom.xml.releaseBackup
 pom.xml.versionsBackup
@@ -9,6 +13,32 @@ dependency-reduced-pom.xml
 buildNumber.properties
 .mvn/timing.properties
 .mvn/wrapper/maven-wrapper.jar
+
+# Node & Frontend dependencies and outputs
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+dist-ssr/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+
+# microPass runtime data, databases, and build workspaces
+data/
+**/data/
+*.db
+*.mv.db
+*.trace.db
+workspaces/
+**/workspaces/
 
 # IDE specific files
 .idea/
@@ -22,15 +52,8 @@ buildNumber.properties
 *.sublime-workspace
 *.sublime-project
 
-# microPass local runtime data and sandboxed build workspaces
-data/
-*.db
-*.mv.db
-*.trace.db
-
 # OS / temporary files
 .DS_Store
 Thumbs.db
 *.log
 *.tmp
-

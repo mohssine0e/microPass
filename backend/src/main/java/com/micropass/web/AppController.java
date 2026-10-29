@@ -26,24 +26,29 @@ public class AppController {
     private final DeploymentPipelineService pipelineService;
     private final LogStreamService logStreamService;
     private final DockerService dockerService;
+    private final com.micropass.service.GitService gitService;
 
     public AppController(
             AppRepository appRepository,
             DeploymentRepository deploymentRepository,
             DeploymentPipelineService pipelineService,
             LogStreamService logStreamService,
-            DockerService dockerService) {
+            DockerService dockerService,
+            com.micropass.service.GitService gitService) {
         this.appRepository = appRepository;
         this.deploymentRepository = deploymentRepository;
         this.pipelineService = pipelineService;
         this.logStreamService = logStreamService;
         this.dockerService = dockerService;
+        this.gitService = gitService;
     }
 
     public record CreateAppRequest(
             @NotBlank String name,
             @NotBlank String gitUrl,
-            String defaultBranch
+            String defaultBranch,
+            String dockerfilePath,
+            Integer targetPort
     ) {}
 
     @PostMapping("/apps")
@@ -52,8 +57,22 @@ public class AppController {
                 .name(req.name().trim().toLowerCase())
                 .gitUrl(req.gitUrl().trim())
                 .defaultBranch(req.defaultBranch() == null || req.defaultBranch().isBlank() ? "main" : req.defaultBranch().trim())
+                .dockerfilePath(req.dockerfilePath() != null && !req.dockerfilePath().isBlank() ? req.dockerfilePath().trim() : "Dockerfile")
+                .targetPort(req.targetPort() != null ? req.targetPort() : 80)
                 .build();
         return ResponseEntity.ok(appRepository.save(app));
+    }
+
+    @GetMapping("/git/branches")
+    public ResponseEntity<List<String>> getBranches(@RequestParam String gitUrl) {
+        return ResponseEntity.ok(gitService.listRemoteBranches(gitUrl));
+    }
+
+    @GetMapping("/apps/{id}/latest-deployment")
+    public ResponseEntity<DeploymentResponse> getLatestDeployment(@PathVariable Long id) {
+        return deploymentRepository.findTopByAppIdOrderByIdDesc(id)
+                .map(d -> ResponseEntity.ok(toResponse(d)))
+                .orElse(ResponseEntity.noContent().build());
     }
 
     @GetMapping("/apps")
@@ -71,6 +90,12 @@ public class AppController {
     public ResponseEntity<Map<String, String>> stopApp(@PathVariable Long id) {
         pipelineService.stopApp(id);
         return ResponseEntity.ok(Map.of("message", "Application stopped successfully"));
+    }
+
+    @DeleteMapping("/apps/{id}")
+    public ResponseEntity<Map<String, String>> deleteApp(@PathVariable Long id) {
+        pipelineService.deleteApp(id);
+        return ResponseEntity.ok(Map.of("message", "Application and workspace deleted successfully"));
     }
 
     @PostMapping("/deployments/{id}/cancel")

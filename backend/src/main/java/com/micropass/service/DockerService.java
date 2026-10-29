@@ -30,9 +30,46 @@ public class DockerService {
         logConsumer.accept(">>> Using Dockerfile: " + dockerfile.toAbsolutePath());
 
         if (!Files.exists(dockerfile)) {
-            String err = "[ERROR] Dockerfile not found at: " + relPath + " (Checked full path: " + dockerfile.toAbsolutePath() + ")";
-            logConsumer.accept(err);
-            return new DockerBuildResult(false, null, err);
+            // Smart Auto-Detection: Generate standard Dockerfile template if missing
+            if (Files.exists(projectDir.resolve("composer.json"))) {
+                logConsumer.accept(">>> [AUTO-DETECT] PHP / Laravel project detected (composer.json found).");
+                logConsumer.accept(">>> Auto-generating standalone PHP web container Dockerfile...");
+                String content = """
+                        FROM php:8.2-cli-alpine
+                        WORKDIR /app
+                        COPY . /app
+                        EXPOSE 80
+                        CMD ["sh", "-c", "if [ -d 'public' ]; then php -S 0.0.0.0:80 -t public; else php -S 0.0.0.0:80; fi"]
+                        """;
+                try {
+                    Files.writeString(dockerfile, content);
+                    logConsumer.accept(">>> Generated Dockerfile template at: " + dockerfile.toAbsolutePath());
+                } catch (Exception e) {
+                    log.warn("Failed to write auto-generated Dockerfile: {}", e.getMessage());
+                }
+            } else if (Files.exists(projectDir.resolve("package.json"))) {
+                logConsumer.accept(">>> [AUTO-DETECT] Node.js project detected (package.json found).");
+                logConsumer.accept(">>> Auto-generating Node.js web container Dockerfile...");
+                String content = """
+                        FROM node:20-alpine
+                        WORKDIR /app
+                        COPY package*.json ./
+                        RUN npm install --omit=dev || npm install
+                        COPY . .
+                        EXPOSE 3000
+                        CMD ["npm", "start"]
+                        """;
+                try {
+                    Files.writeString(dockerfile, content);
+                    logConsumer.accept(">>> Generated Dockerfile template at: " + dockerfile.toAbsolutePath());
+                } catch (Exception e) {
+                    log.warn("Failed to write auto-generated Dockerfile: {}", e.getMessage());
+                }
+            } else {
+                String err = "[ERROR] Dockerfile not found at: " + relPath + " (Checked full path: " + dockerfile.toAbsolutePath() + ")";
+                logConsumer.accept(err);
+                return new DockerBuildResult(false, null, err);
+            }
         }
 
         List<String> buildCmd = List.of(
