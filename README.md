@@ -22,7 +22,6 @@ together.
 - HTTP readiness checks before replacing the previous healthy container
 - Live logs over Server-Sent Events with bounded replay and terminal events
 - Unit tests, PostgreSQL Testcontainers integration testing, and GitHub Actions CI
-- Offline interactive Engineering Academy for learning and interview practice
 
 ## Architecture in one picture
 
@@ -241,17 +240,8 @@ npm ci
 npm run build
 ```
 
-Academy JavaScript syntax check:
-
-```bash
-node --check docs/learning/academy/app.js
-```
-
 ## Learn the project
 
-- [Interactive Engineering Academy](docs/learning/academy/README.md) — lessons,
-  animated architecture, comparisons, flashcards, scenarios, model answers,
-  glossary, notebook, and saved progress
 - [One-week learning route](docs/learning/ONE_WEEK_ENGINEERING_ROUTE.md) — daily
   code-reading, testing, and speaking exercises
 - [Interview rehearsal guide](docs/INTERVIEW_REHEARSAL.md) — short project
@@ -286,7 +276,7 @@ microPass/
 ├── frontend/                 React, TypeScript, Vite, Tailwind dashboard
 ├── docs/
 │   ├── decisions/            Architecture Decision Records
-│   ├── learning/             Academy and one-week study material
+│   ├── learning/             One-week study material
 │   ├── phases/               Historical implementation records
 │   └── troubleshooting/      Focused operational investigations
 ├── fixtures/sample-app/      Small Git repository for deployment demos

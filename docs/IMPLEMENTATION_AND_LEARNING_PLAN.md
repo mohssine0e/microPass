@@ -21,7 +21,7 @@ resume keywords.
 - Deployment state and logs are consistent in the database and UI.
 - PostgreSQL, RabbitMQ, tests, and CI have a documented setup.
 - The React frontend builds successfully and uses deployable API URLs.
-- The interactive Engineering Academy teaches the implemented architecture from first principles.
+- The one-week learning route and interview guide teach the implemented architecture from first principles.
 - Documentation describes current behavior and known limitations honestly.
 
 ## Phase 0 — Protect the Work and Establish the Map
@@ -214,7 +214,7 @@ terminal event. `scripts/build-all.sh` performs a reproducible combined build.
 
 ## Phase 5 — Interactive microPass Engineering Academy
 
-**Status:** Complete
+**Status:** Complete; maintained in a separate local repository since 2026-11-06
 
 **Goal:** Create an offline, attractive learning system tied directly to this repository.
 
@@ -246,6 +246,8 @@ answers, a searchable glossary, and a persistent notebook. Progress, confidence,
 theme, quiz score, and notes are local to the browser. JavaScript syntax and real
 desktop/mobile browser rendering were verified; the hero was adjusted so useful
 content is visible immediately while later sections retain reveal animations.
+The Academy was moved out of the product repository so future product commits
+do not publish personal learning progress or curriculum changes.
 
 ---
 
@@ -314,7 +316,7 @@ boundary deliberately. Some implementation files span two phases; use
 | Safe lifecycle and API rules | pipeline, Docker/health/port/log services, controllers, lifecycle tests | `feat: deploy health-checked candidate containers safely` |
 | PostgreSQL and CI | backend POM, profile, migration, Compose, Testcontainers, workflow | `test: add PostgreSQL migrations integration tests and CI` |
 | React product packaging | `frontend/`, Maven static resource copy, `scripts/build-all.sh` | `feat: consolidate the dashboard around the React client` |
-| Engineering Academy | `docs/learning/academy/` | `docs: add interactive microPass engineering academy` |
+| Engineering Academy | Separate local repository | Local Academy commits only |
 | Demo and interview readiness | README, ADRs, one-week route, demo, interview guide | `docs: prepare microPass v0.1 demo and interview guide` |
 
 ## Verification Log
@@ -326,7 +328,7 @@ boundary deliberately. Some implementation files span two phases; use
 | 2026-11-06 | `mvn -DskipTests package` | Passed | Backend executable JAR built. |
 | 2026-11-06 | Focused backend suite | Passed | 13 tests passed: command, health, queue/idempotency, atomic cancellation, lifecycle, path validation. |
 | 2026-11-06 | PostgreSQL Testcontainers test | Passed | PostgreSQL 16 started, Flyway V1 applied, repository relations persisted. |
-| 2026-11-06 | `node --check docs/learning/academy/app.js` | Passed | Academy JavaScript parsed successfully. |
+| 2026-11-06 | Academy JavaScript syntax check | Passed | Verified before moving Academy to its local repository. |
 | 2026-11-06 | Headless Firefox desktop/mobile renders | Passed | Academy hero and responsive layout inspected visually. |
 | 2026-11-06 | Isolated full-stack smoke deployment | Passed | Packaged React, RabbitMQ, Git, Docker, readiness, SSE, cancellation with previous-container survival, status, and delete cleanup verified. |
 | 2026-11-06 | `./scripts/build-all.sh` | Passed | Vite 8 build, 20 Maven tests, PostgreSQL migration, executable JAR, and embedded React check passed. |

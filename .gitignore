@@ -40,6 +40,9 @@ data/
 workspaces/
 **/workspaces/
 
+# Personal Engineering Academy lives in a separate local repository
+/docs/learning/academy/
+
 # IDE specific files
 .idea/
 *.iml

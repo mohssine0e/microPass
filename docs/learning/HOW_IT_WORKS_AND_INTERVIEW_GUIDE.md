@@ -9,15 +9,13 @@ Use these current sources instead:
 
 1. [Architecture](../ARCHITECTURE.md) — exact request flow, components, state
    machine, concurrency model, failure behavior, and code trace
-2. [Interactive Engineering Academy](academy/README.md) — beginner-first
-   lessons, animations, comparisons, flashcards, scenarios, glossary, and notes
-3. [One-week engineering route](ONE_WEEK_ENGINEERING_ROUTE.md) — daily reading,
+2. [One-week engineering route](ONE_WEEK_ENGINEERING_ROUTE.md) — daily reading,
    proof exercises, explanations, and answers
-4. [Interview rehearsal guide](../INTERVIEW_REHEARSAL.md) — 30/90-second
+3. [Interview rehearsal guide](../INTERVIEW_REHEARSAL.md) — 30/90-second
    explanations, 26 questions with answers, cautions, and a scoring rubric
-5. [Five-minute demo](../DEMO_SCRIPT.md) — repeatable live presentation and
+4. [Five-minute demo](../DEMO_SCRIPT.md) — repeatable live presentation and
    failure demonstrations
-6. [Architecture Decision Records](../decisions/) — why RabbitMQ, PostgreSQL,
+5. [Architecture Decision Records](../decisions/) — why RabbitMQ, PostgreSQL,
    Flyway, SSE, and candidate promotion were selected
 
 ## Current flow in one paragraph

@@ -9,12 +9,12 @@ why each technology exists.
 
 Use three blocks:
 
-1. **Learn — 45 minutes:** read the academy lesson and the linked source.
+1. **Learn — 45 minutes:** read the day's concepts and linked source.
 2. **Prove — 45 minutes:** run, test, or deliberately break one behavior.
 3. **Explain — 20 minutes:** close the notes and speak for 60–90 seconds.
 
-Use [LEARNING_JOURNAL.md](academy/LEARNING_JOURNAL.md) after each session. If you
-cannot explain a concept without reading, mark it as “recognize” rather than
+Keep a local learning journal after each session. If you cannot explain a
+concept without reading, mark it as “recognize” rather than
 “understand” and revisit it.
 
 ## Day 1 — Product, HTTP, Spring, and the state machine
@@ -34,7 +34,7 @@ cannot explain a concept without reading, mark it as “recognize” rather than
 - `AppController.java`
 - `DeploymentPipelineService.triggerDeployment`
 - `DeploymentStatus.java`
-- Academy modules: **System mental model** and **Java 21 and Spring Boot**
+- Study topics: **System mental model** and **Java 21 and Spring Boot**
 
 ### Prove
 
@@ -130,7 +130,7 @@ producer → exchange → routing key → queue → consumer → ACK
 - `DeploymentWorker.java`
 - `DeploymentRepository.transitionStatus`
 - `DeploymentPipelineService.runPipeline`
-- Academy module: **RabbitMQ and job delivery**
+- Study topic: **RabbitMQ and job delivery**
 
 ### Prove
 
@@ -178,7 +178,7 @@ to the DLQ merely because the deployed code failed.
 - `V1__create_micropass_schema.sql`
 - `application-postgres.properties`
 - `AppRepositoryPostgresIntegrationTest.java`
-- Academy module: **PostgreSQL and transactions**
+- Study topic: **PostgreSQL and transactions**
 
 ### Prove
 
@@ -226,7 +226,7 @@ closing the sudden-crash gap between database insert and broker publish.
 - `PortAllocationService.java`
 - `HealthCheckService.java`
 - The promotion section of `DeploymentPipelineService.runPipeline`
-- Academy module: **Docker and deployment safety**
+- Study topic: **Docker and deployment safety**
 
 ### Prove
 
@@ -273,7 +273,7 @@ two side effects atomic.
 - `frontend/src/api.ts`
 - `LogConsoleModal.tsx`
 - `.github/workflows/ci.yml`
-- Academy modules: **SSE, HTTP, and React** and **Testing and CI**
+- Study topics: **SSE, HTTP, and React** and **Testing and CI**
 
 ### Prove
 
@@ -317,7 +317,7 @@ boundaries, and a small number of full journeys.
 
 ### Read
 
-- Academy module: **Cloud and DevOps foundations**
+- Study topic: **Cloud and DevOps foundations**
 - [Demo script](../DEMO_SCRIPT.md)
 - [Interview rehearsal](../INTERVIEW_REHEARSAL.md)
 - “Deferred deliberately” in the implementation plan
