@@ -8,7 +8,11 @@ import com.micropass.service.DeploymentPipelineService;
 import com.micropass.service.DockerService;
 import com.micropass.service.LogStreamService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +20,8 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.Map;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 
 @RestController
 @RequestMapping("/api")
@@ -44,20 +50,24 @@ public class AppController {
     }
 
     public record CreateAppRequest(
-            @NotBlank String name,
-            @NotBlank String gitUrl,
-            String defaultBranch,
-            String dockerfilePath,
-            Integer targetPort
+            @NotBlank
+            @Pattern(regexp = "[A-Za-z0-9][A-Za-z0-9_-]{0,62}",
+                    message = "must start with a letter or number and contain only letters, numbers, '-' or '_'")
+            String name,
+            @NotBlank @Size(max = 2048) String gitUrl,
+            @Size(max = 255) String defaultBranch,
+            @Size(max = 500) String dockerfilePath,
+            @Min(1) @Max(65535) Integer targetPort
     ) {}
 
     @PostMapping("/apps")
     public ResponseEntity<App> createApp(@RequestBody @Valid CreateAppRequest req) {
+        String dockerfilePath = normalizeDockerfilePath(req.dockerfilePath());
         App app = App.builder()
                 .name(req.name().trim().toLowerCase())
                 .gitUrl(req.gitUrl().trim())
                 .defaultBranch(req.defaultBranch() == null || req.defaultBranch().isBlank() ? "main" : req.defaultBranch().trim())
-                .dockerfilePath(req.dockerfilePath() != null && !req.dockerfilePath().isBlank() ? req.dockerfilePath().trim() : "Dockerfile")
+                .dockerfilePath(dockerfilePath)
                 .targetPort(req.targetPort() != null ? req.targetPort() : 80)
                 .build();
         return ResponseEntity.ok(appRepository.save(app));
@@ -73,6 +83,18 @@ public class AppController {
         return deploymentRepository.findTopByAppIdOrderByIdDesc(id)
                 .map(d -> ResponseEntity.ok(toResponse(d)))
                 .orElse(ResponseEntity.noContent().build());
+    }
+
+    @GetMapping("/apps/{id}/deployments")
+    public ResponseEntity<List<DeploymentResponse>> getDeploymentHistory(@PathVariable Long id) {
+        if (!appRepository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        List<DeploymentResponse> history = deploymentRepository.findByAppIdOrderByIdDesc(id)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+        return ResponseEntity.ok(history);
     }
 
     @GetMapping("/apps")
@@ -111,7 +133,10 @@ public class AppController {
     @GetMapping("/apps/{id}/status")
     public ResponseEntity<Map<String, Object>> getAppStatus(@PathVariable Long id) {
         return appRepository.findById(id).map(app -> {
-            boolean isRunning = dockerService.isContainerRunning("micropass-" + app.getName());
+            String containerNameOrId = app.getActiveContainerId() != null && !app.getActiveContainerId().isBlank()
+                    ? app.getActiveContainerId()
+                    : "micropass-" + app.getName();
+            boolean isRunning = dockerService.isContainerRunning(containerNameOrId);
             return ResponseEntity.ok(Map.<String, Object>of(
                     "appId", app.getId(),
                     "name", app.getName(),
@@ -142,6 +167,24 @@ public class AppController {
                 d.getStartedAt(),
                 d.getFinishedAt()
         );
+    }
+
+    private String normalizeDockerfilePath(String requestedPath) {
+        String value = requestedPath == null || requestedPath.isBlank()
+                ? "Dockerfile"
+                : requestedPath.trim();
+        if (value.matches("^[A-Za-z]:[\\\\/].*") || value.startsWith("/") || value.startsWith("\\\\")) {
+            throw new InvalidRequestException("dockerfilePath must be relative to the repository root");
+        }
+        try {
+            Path normalized = Path.of(value).normalize();
+            if (normalized.toString().isBlank() || normalized.startsWith("..")) {
+                throw new InvalidRequestException("dockerfilePath must stay inside the repository root");
+            }
+            return normalized.toString().replace('\\', '/');
+        } catch (InvalidPathException exception) {
+            throw new InvalidRequestException("dockerfilePath is not a valid path");
+        }
     }
 
     @GetMapping(value = "/deployments/{id}/logs/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

@@ -40,8 +40,6 @@ public class PortAllocationService {
 
         for (int p = portStart; p <= portEnd; p++) {
             if (!usedPorts.contains(p) && isPortAvailable(p)) {
-                app.setAllocatedPort(p);
-                appRepository.save(app);
                 return p;
             }
         }
@@ -58,4 +56,3 @@ public class PortAllocationService {
         }
     }
 }
-
