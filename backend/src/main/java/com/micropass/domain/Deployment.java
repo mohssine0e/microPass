@@ -31,9 +31,7 @@ public class Deployment {
     @Column
     private Integer port;
 
-    @Lob // this annotation specifies that the field should be stored as a large object
-         // in the database
-    @Column(length = 1000000)
+    @Column(columnDefinition = "TEXT")
     private String buildLogs;
 
     @Column
