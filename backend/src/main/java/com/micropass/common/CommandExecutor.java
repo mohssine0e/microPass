@@ -2,6 +2,9 @@ package com.micropass.common;
 
 import java.io.File;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -21,6 +24,7 @@ public class CommandExecutor {
                                           AtomicReference<Process> processRef) {
         StringBuilder fullOutput = new StringBuilder();
         Process process = null;
+        Thread outputReader = null;
         try {
             ProcessBuilder processBuilder = new ProcessBuilder(command);
             if (workingDir != null) {
@@ -33,77 +37,122 @@ public class CommandExecutor {
                 processRef.set(process);
             }
 
-            try (InputStream in = process.getInputStream()) {
-                StringBuilder lineBuffer = new StringBuilder();
-                long lastCarriageReturnEmit = 0;
-                int b;
-                while ((b = in.read()) != -1) {
-                    if (cancellationFlag != null && cancellationFlag.get()) {
-                        killProcessTree(process);
-                        String cancelMsg = "[CANCELLED] Process killed immediately by user cancellation.";
-                        if (logConsumer != null) logConsumer.accept(cancelMsg);
-                        return new ExecutionResult(-99, fullOutput + "\n" + cancelMsg);
-                    }
+            InputStream processOutput = process.getInputStream();
+            outputReader = Thread.ofVirtual()
+                    .name("command-output-reader-" + process.pid())
+                    .start(() -> consumeOutput(processOutput, fullOutput, logConsumer));
 
-                    char c = (char) b;
-                    if (c == '\n') {
-                        if (!lineBuffer.isEmpty()) {
-                            String line = lineBuffer.toString();
-                            fullOutput.append(line).append("\n");
-                            if (logConsumer != null) {
-                                logConsumer.accept(line);
-                            }
-                            lineBuffer.setLength(0);
-                        }
-                    } else if (c == '\r') {
-                        long now = System.currentTimeMillis();
-                        if (!lineBuffer.isEmpty()) {
-                            String line = lineBuffer.toString();
-                            // Debounce progress ticks to at most once per 150ms or on completion (100% / done)
-                            if (now - lastCarriageReturnEmit > 150 || line.contains("100%") || line.contains("done")) {
-                                fullOutput.append(line).append("\n");
-                                if (logConsumer != null) {
-                                    logConsumer.accept(line);
-                                }
-                                lastCarriageReturnEmit = now;
-                            }
-                            lineBuffer.setLength(0);
-                        }
-                    } else {
-                        lineBuffer.append(c);
-                    }
+            long timeoutNanos = unit.toNanos(timeout);
+            long deadline = System.nanoTime() + timeoutNanos;
+            boolean cancelled = false;
+            boolean timedOut = false;
+
+            while (process.isAlive()) {
+                if (cancellationFlag != null && cancellationFlag.get()) {
+                    cancelled = true;
+                    killProcessTree(process);
+                    break;
                 }
-                if (!lineBuffer.isEmpty()) {
-                    String line = lineBuffer.toString();
-                    fullOutput.append(line).append("\n");
-                    if (logConsumer != null) {
-                        logConsumer.accept(line);
-                    }
+
+                long remainingNanos = deadline - System.nanoTime();
+                if (remainingNanos <= 0) {
+                    timedOut = true;
+                    killProcessTree(process);
+                    break;
                 }
+
+                process.waitFor(Math.min(remainingNanos, TimeUnit.MILLISECONDS.toNanos(100)), TimeUnit.NANOSECONDS);
             }
 
-            boolean finished = process.waitFor(timeout, unit);
-            if (!finished) {
-                killProcessTree(process);
-                String err = "Process timed out after " + timeout + " " + unit.name().toLowerCase();
-                if (logConsumer != null) logConsumer.accept(err);
-                return new ExecutionResult(-1, fullOutput + "\n" + err);
+            joinReader(outputReader);
+
+            if (cancelled) {
+                String message = "[CANCELLED] Process killed immediately by user cancellation.";
+                emitAndAppend(fullOutput, logConsumer, message);
+                return new ExecutionResult(-99, fullOutput.toString());
+            }
+
+            if (timedOut) {
+                String message = "Process timed out after " + timeout + " " + unit.name().toLowerCase();
+                emitAndAppend(fullOutput, logConsumer, message);
+                return new ExecutionResult(-1, fullOutput.toString());
             }
 
             return new ExecutionResult(process.exitValue(), fullOutput.toString());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            if (process != null) {
+                killProcessTree(process);
+            }
+            joinReader(outputReader);
+            String errorMsg = "Execution interrupted";
+            emitAndAppend(fullOutput, logConsumer, errorMsg);
+            return new ExecutionResult(-1, fullOutput.toString());
         } catch (Exception e) {
             if (process != null) {
                 killProcessTree(process);
             }
+            joinReader(outputReader);
             String errorMsg = "Execution failed: " + e.getMessage();
-            if (logConsumer != null) {
-                logConsumer.accept(errorMsg);
-            }
-            return new ExecutionResult(-1, errorMsg);
+            emitAndAppend(fullOutput, logConsumer, errorMsg);
+            return new ExecutionResult(-1, fullOutput.toString());
         } finally {
             if (processRef != null) {
                 processRef.set(null);
             }
+        }
+    }
+
+    private static void consumeOutput(InputStream input, StringBuilder fullOutput, Consumer<String> logConsumer) {
+        try (Reader reader = new InputStreamReader(input, StandardCharsets.UTF_8)) {
+            StringBuilder lineBuffer = new StringBuilder();
+            long lastCarriageReturnEmit = 0;
+            int value;
+            while ((value = reader.read()) != -1) {
+                char c = (char) value;
+                if (c == '\n') {
+                    if (!lineBuffer.isEmpty()) {
+                        emitAndAppend(fullOutput, logConsumer, lineBuffer.toString());
+                        lineBuffer.setLength(0);
+                    }
+                } else if (c == '\r') {
+                    long now = System.currentTimeMillis();
+                    if (!lineBuffer.isEmpty()) {
+                        String line = lineBuffer.toString();
+                        if (now - lastCarriageReturnEmit > 150 || line.contains("100%") || line.contains("done")) {
+                            emitAndAppend(fullOutput, logConsumer, line);
+                            lastCarriageReturnEmit = now;
+                        }
+                        lineBuffer.setLength(0);
+                    }
+                } else {
+                    lineBuffer.append(c);
+                }
+            }
+
+            if (!lineBuffer.isEmpty()) {
+                emitAndAppend(fullOutput, logConsumer, lineBuffer.toString());
+            }
+        } catch (Exception ignored) {
+            // The stream normally closes when a timed-out or cancelled process is killed.
+        }
+    }
+
+    private static void emitAndAppend(StringBuilder output, Consumer<String> logConsumer, String message) {
+        synchronized (output) {
+            output.append(message).append("\n");
+        }
+        if (logConsumer != null) {
+            logConsumer.accept(message);
+        }
+    }
+
+    private static void joinReader(Thread reader) {
+        if (reader == null) return;
+        try {
+            reader.join(2_000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 

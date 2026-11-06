@@ -3,6 +3,7 @@ package com.micropass.service;
 import com.micropass.common.CommandExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Files;
@@ -14,6 +15,18 @@ import java.util.function.Consumer;
 public class DockerService {
 
     private static final Logger log = LoggerFactory.getLogger(DockerService.class);
+    private final String memoryLimit;
+    private final String cpuLimit;
+    private final int pidsLimit;
+
+    public DockerService(
+            @Value("${micropass.container.memory:512m}") String memoryLimit,
+            @Value("${micropass.container.cpus:1.0}") String cpuLimit,
+            @Value("${micropass.container.pids-limit:256}") int pidsLimit) {
+        this.memoryLimit = memoryLimit;
+        this.cpuLimit = cpuLimit;
+        this.pidsLimit = pidsLimit;
+    }
 
     public record DockerBuildResult(boolean success, String imageTag, String logs) {}
     public record DockerRunResult(boolean success, String containerId, String logs) {}
@@ -23,7 +36,14 @@ public class DockerService {
                                         java.util.concurrent.atomic.AtomicReference<Process> processRef) {
         String fullTag = imageName.toLowerCase() + ":" + tag;
         String relPath = (dockerfileRelPath == null || dockerfileRelPath.isBlank()) ? "Dockerfile" : dockerfileRelPath.trim();
-        Path dockerfile = projectDir.resolve(relPath);
+        Path normalizedProjectDir = projectDir.toAbsolutePath().normalize();
+        Path dockerfile = normalizedProjectDir.resolve(relPath).normalize();
+
+        if (!dockerfile.startsWith(normalizedProjectDir)) {
+            String err = "[ERROR] Dockerfile path must stay inside the application workspace: " + relPath;
+            logConsumer.accept(err);
+            return new DockerBuildResult(false, null, err);
+        }
 
         logConsumer.accept(">>> STEP 2/5: Packaging application into Docker image...");
         logConsumer.accept(">>> Target Image Tag: " + fullTag);
@@ -102,6 +122,9 @@ public class DockerService {
                 "docker", "run", "-d",
                 "--name", containerName,
                 "-p", hostPort + ":" + containerPort,
+                "--memory", memoryLimit,
+                "--cpus", cpuLimit,
+                "--pids-limit", String.valueOf(pidsLimit),
                 "--restart", "unless-stopped",
                 fullImageTag
         );
@@ -134,4 +157,3 @@ public class DockerService {
         return result.exitCode() == 0 && result.output().trim().equalsIgnoreCase("true");
     }
 }
-
