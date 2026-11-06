@@ -23,6 +23,7 @@ export const LogConsoleModal: React.FC<LogConsoleModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
@@ -41,10 +42,6 @@ export const LogConsoleModal: React.FC<LogConsoleModalProps> = ({
     const es = new EventSource(streamUrl);
     eventSourceRef.current = es;
 
-    es.onopen = () => {
-      setLogs((prev) => (prev.length === 0 ? ['>>> Connected to deployment live stream...'] : prev));
-    };
-
     es.onmessage = (event) => {
       const line = event.data;
       setLogs((prev) => [...prev, line]);
@@ -61,11 +58,22 @@ export const LogConsoleModal: React.FC<LogConsoleModalProps> = ({
       }
     };
 
+    const handleComplete = (event: Event) => {
+      const finalStatus = (event as MessageEvent<string>).data as DeploymentStatus | 'TERMINAL';
+      if (finalStatus !== 'TERMINAL') {
+        setStatus(finalStatus);
+        onStatusChange?.(finalStatus);
+      }
+      es.close();
+    };
+    es.addEventListener('complete', handleComplete);
+
     es.onerror = () => {
       // EventSource automatically retries unless closed
     };
 
     return () => {
+      es.removeEventListener('complete', handleComplete);
       es.close();
     };
   }, [deploymentId, onStatusChange]);
@@ -83,13 +91,14 @@ export const LogConsoleModal: React.FC<LogConsoleModalProps> = ({
   };
 
   const handleCancel = async () => {
+    setError(null);
     setCancelling(true);
     try {
       await cancelDeployment(deploymentId);
       setStatus('CANCELLED');
       onStatusChange?.('CANCELLED');
-    } catch (e) {
-      console.error('Cancel failed', e);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to cancel deployment');
     } finally {
       setCancelling(false);
     }
@@ -178,6 +187,11 @@ export const LogConsoleModal: React.FC<LogConsoleModalProps> = ({
         </div>
 
         {/* Modal Footer */}
+        {error && (
+          <div className="border-t border-rose-500/20 bg-rose-500/10 px-5 py-2 text-xs text-rose-300" role="alert">
+            {error}
+          </div>
+        )}
         <div className="px-5 py-3 border-t border-slate-800 bg-slate-900/90 flex items-center justify-between text-xs">
           <div className="flex items-center space-x-2 text-slate-400">
             <span className={`h-2 w-2 rounded-full ${isTerminalState ? 'bg-slate-500' : 'bg-emerald-400 animate-pulse'}`} />
@@ -208,4 +222,3 @@ export const LogConsoleModal: React.FC<LogConsoleModalProps> = ({
     </div>
   );
 };
-

@@ -10,6 +10,7 @@ import { Plus, Server, RefreshCw } from 'lucide-react';
 export function App() {
   const [apps, setApps] = useState<AppType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [activeConsole, setActiveConsole] = useState<{
     deploymentId: number;
@@ -35,8 +36,9 @@ export function App() {
         })
       );
       setApps(enriched);
-    } catch (e) {
-      console.error('Failed to load apps', e);
+      setError(null);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to load applications');
     } finally {
       setLoading(false);
     }
@@ -54,6 +56,22 @@ export function App() {
       <Navbar onNewApp={() => setShowCreateModal(true)} appCount={apps.length} />
 
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        {error && (
+          <div className="mb-6 flex items-start justify-between gap-4 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200" role="alert">
+            <div>
+              <p className="font-semibold">microPass could not complete the request.</p>
+              <p className="mt-0.5 text-xs text-rose-300/90">{error}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              className="text-xs font-semibold text-rose-300 hover:text-white"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
         {/* Top Header / Actions */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -109,6 +127,7 @@ export function App() {
                   setActiveConsole({ deploymentId: depId, appName: name, status })
                 }
                 onRefresh={loadData}
+                onError={setError}
               />
             ))}
           </div>
@@ -134,4 +153,3 @@ export function App() {
 }
 
 export default App;
-

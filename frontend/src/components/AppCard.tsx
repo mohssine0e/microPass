@@ -7,9 +7,10 @@ interface AppCardProps {
   app: App;
   onOpenLogs: (deploymentId: number, appName: string, status: DeploymentStatus) => void;
   onRefresh: () => void;
+  onError: (message: string) => void;
 }
 
-export const AppCard: React.FC<AppCardProps> = ({ app, onOpenLogs, onRefresh }) => {
+export const AppCard: React.FC<AppCardProps> = ({ app, onOpenLogs, onRefresh, onError }) => {
   const [deploying, setDeploying] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -17,6 +18,7 @@ export const AppCard: React.FC<AppCardProps> = ({ app, onOpenLogs, onRefresh }) 
   const deployment = app.latestDeployment;
   const status = deployment?.status || (app.running ? 'HEALTHY' : 'STOPPED');
   const isBuilding = status === 'QUEUED' || status === 'CLONING' || status === 'BUILDING' || status === 'DEPLOYING';
+  const liveHost = window.location.hostname || 'localhost';
 
   const handleDeploy = async () => {
     setDeploying(true);
@@ -24,8 +26,8 @@ export const AppCard: React.FC<AppCardProps> = ({ app, onOpenLogs, onRefresh }) 
       const dep = await triggerDeploy(app.id);
       onOpenLogs(dep.id, app.name, dep.status);
       onRefresh();
-    } catch (e) {
-      console.error(e);
+    } catch (e: unknown) {
+      onError(e instanceof Error ? e.message : 'Failed to trigger deployment');
     } finally {
       setDeploying(false);
     }
@@ -36,8 +38,8 @@ export const AppCard: React.FC<AppCardProps> = ({ app, onOpenLogs, onRefresh }) 
     try {
       await stopApp(app.id);
       onRefresh();
-    } catch (e) {
-      console.error(e);
+    } catch (e: unknown) {
+      onError(e instanceof Error ? e.message : 'Failed to stop application');
     } finally {
       setStopping(false);
     }
@@ -49,27 +51,27 @@ export const AppCard: React.FC<AppCardProps> = ({ app, onOpenLogs, onRefresh }) 
     try {
       await deleteApp(app.id);
       onRefresh();
-    } catch (e) {
-      console.error(e);
+    } catch (e: unknown) {
+      onError(e instanceof Error ? e.message : 'Failed to delete application');
     } finally {
       setDeleting(false);
     }
   };
 
   const getStatusBadge = () => {
-    if (status === 'HEALTHY' || (app.running && !deployment)) {
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          Running (Healthy)
-        </span>
-      );
-    }
     if (isBuilding) {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">
           <Loader2 className="h-3 w-3 animate-spin text-blue-400" />
           {status}...
+        </span>
+      );
+    }
+    if (app.running) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          {status === 'FAILED' ? 'Running · last deploy failed' : 'Running (Healthy)'}
         </span>
       );
     }
@@ -107,7 +109,7 @@ export const AppCard: React.FC<AppCardProps> = ({ app, onOpenLogs, onRefresh }) 
               {app.name}
               {app.allocatedPort && app.running && (
                 <a
-                  href={`http://localhost:${app.allocatedPort}`}
+                  href={`http://${liveHost}:${app.allocatedPort}`}
                   target="_blank"
                   rel="noreferrer"
                   className="text-cyan-400 hover:text-cyan-300 transition"
@@ -186,9 +188,9 @@ export const AppCard: React.FC<AppCardProps> = ({ app, onOpenLogs, onRefresh }) 
         {app.running && (
           <button
             onClick={handleStop}
-            disabled={stopping}
-            className="p-2 rounded-lg bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700 transition"
-            title="Stop Container"
+            disabled={stopping || isBuilding}
+            className="p-2 rounded-lg bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700 transition disabled:cursor-not-allowed disabled:opacity-40"
+            title={isBuilding ? 'Cancel the active deployment before stopping the app' : 'Stop Container'}
           >
             {stopping ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Square className="h-3.5 w-3.5" />}
           </button>
@@ -206,4 +208,3 @@ export const AppCard: React.FC<AppCardProps> = ({ app, onOpenLogs, onRefresh }) 
     </div>
   );
 };
-

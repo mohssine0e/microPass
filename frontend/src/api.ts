@@ -1,22 +1,35 @@
 import { App, Deployment, CreateAppForm } from './types';
 
-const API_BASE = 'http://localhost:9090/api';
+const configuredApiBase = import.meta.env.VITE_API_BASE?.replace(/\/$/, '');
+const API_BASE = configuredApiBase || '/api';
+
+async function errorMessage(res: Response, fallback: string): Promise<string> {
+  const text = await res.text();
+  if (!text) return fallback;
+  try {
+    const body = JSON.parse(text);
+    return body.message || fallback;
+  } catch {
+    return text;
+  }
+}
 
 export async function fetchApps(): Promise<App[]> {
   const res = await fetch(`${API_BASE}/apps`);
-  if (!res.ok) throw new Error('Failed to fetch applications');
+  if (!res.ok) throw new Error(await errorMessage(res, 'Failed to fetch applications'));
   return res.json();
 }
 
 export async function fetchAppStatus(id: number): Promise<{ running: boolean; allocatedPort?: number; activeContainerId?: string }> {
   const res = await fetch(`${API_BASE}/apps/${id}/status`);
-  if (!res.ok) return { running: false };
+  if (!res.ok) throw new Error(await errorMessage(res, 'Failed to read application runtime status'));
   return res.json();
 }
 
 export async function fetchLatestDeployment(appId: number): Promise<Deployment | null> {
   const res = await fetch(`${API_BASE}/apps/${appId}/latest-deployment`);
-  if (res.status === 204 || !res.ok) return null;
+  if (res.status === 204) return null;
+  if (!res.ok) throw new Error(await errorMessage(res, 'Failed to read latest deployment'));
   return res.json();
 }
 
@@ -27,8 +40,7 @@ export async function createApp(form: CreateAppForm): Promise<App> {
     body: JSON.stringify(form),
   });
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err || 'Failed to create application');
+    throw new Error(await errorMessage(res, 'Failed to create application'));
   }
   return res.json();
 }
@@ -37,28 +49,29 @@ export async function triggerDeploy(appId: number): Promise<Deployment> {
   const res = await fetch(`${API_BASE}/apps/${appId}/deploy`, {
     method: 'POST',
   });
-  if (!res.ok) throw new Error('Failed to trigger deployment');
+  if (!res.ok) throw new Error(await errorMessage(res, 'Failed to trigger deployment'));
   return res.json();
 }
 
 export async function cancelDeployment(deploymentId: number): Promise<void> {
-  await fetch(`${API_BASE}/deployments/${deploymentId}/cancel`, {
+  const res = await fetch(`${API_BASE}/deployments/${deploymentId}/cancel`, {
     method: 'POST',
   });
+  if (!res.ok) throw new Error(await errorMessage(res, 'Failed to cancel deployment'));
 }
 
 export async function stopApp(appId: number): Promise<void> {
   const res = await fetch(`${API_BASE}/apps/${appId}/stop`, {
     method: 'POST',
   });
-  if (!res.ok) throw new Error('Failed to stop application');
+  if (!res.ok) throw new Error(await errorMessage(res, 'Failed to stop application'));
 }
 
 export async function deleteApp(appId: number): Promise<void> {
   const res = await fetch(`${API_BASE}/apps/${appId}`, {
     method: 'DELETE',
   });
-  if (!res.ok) throw new Error('Failed to delete application');
+  if (!res.ok) throw new Error(await errorMessage(res, 'Failed to delete application'));
 }
 
 export async function fetchBranches(gitUrl: string): Promise<string[]> {
@@ -75,4 +88,3 @@ export async function fetchBranches(gitUrl: string): Promise<string[]> {
 export function getStreamUrl(deploymentId: number): string {
   return `${API_BASE}/deployments/${deploymentId}/logs/stream`;
 }
-

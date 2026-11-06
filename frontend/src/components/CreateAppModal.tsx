@@ -94,17 +94,18 @@ export const CreateAppModal: React.FC<CreateAppModalProps> = ({ onClose, onCreat
 
           <div>
             <label className="block text-xs font-medium text-slate-300 mb-1.5">
-              Git Repository URL <span className="text-cyan-400">*</span>
+              Git Repository URL or Local Path <span className="text-cyan-400">*</span>
             </label>
             <input
-              type="url"
+              type="text"
               required
-              placeholder="https://github.com/user/repo.git"
+              placeholder="https://github.com/user/repo.git or /home/.../path"
               value={form.gitUrl}
               onChange={(e) => setForm({ ...form, gitUrl: e.target.value })}
               onBlur={handleGitUrlBlur}
               className="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
             />
+            <p className="text-[11px] text-slate-500 mt-1">Accepts Git HTTP(S) URLs or absolute local directories.</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
