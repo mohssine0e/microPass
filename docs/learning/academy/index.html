@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Interactive engineering academy for the microPass self-hosted PaaS." />
+  <title>microPass Engineering Academy</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="ambient ambient-one" aria-hidden="true"></div>
+  <div class="ambient ambient-two" aria-hidden="true"></div>
+  <div class="noise" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <a class="brand" href="#home" aria-label="microPass Academy home">
+      <span class="brand-mark">µP</span>
+      <span>
+        <strong>microPass</strong>
+        <small>Engineering Academy</small>
+      </span>
+    </a>
+    <div class="topbar-actions">
+      <span class="save-state" id="saveState"><span></span> Progress saved locally</span>
+      <button class="icon-button" id="themeButton" type="button" aria-label="Toggle color theme">☼</button>
+      <button class="mobile-menu" id="mobileMenu" type="button" aria-label="Open navigation">☰</button>
+    </div>
+  </header>
+
+  <div class="shell">
+    <aside class="sidebar" id="sidebar">
+      <nav aria-label="Academy sections">
+        <p class="nav-label">Learn</p>
+        <a class="nav-link active" href="#home"><span>01</span> Home</a>
+        <a class="nav-link" href="#system"><span>02</span> System journey</a>
+        <a class="nav-link" href="#lessons"><span>03</span> Guided lessons</a>
+        <a class="nav-link" href="#compare"><span>04</span> Difference lab</a>
+        <p class="nav-label">Practice</p>
+        <a class="nav-link" href="#flashcards"><span>05</span> Flashcards</a>
+        <a class="nav-link" href="#quiz"><span>06</span> Knowledge check</a>
+        <a class="nav-link" href="#interview"><span>07</span> Interview lab</a>
+        <p class="nav-label">Own the knowledge</p>
+        <a class="nav-link" href="#glossary"><span>08</span> Glossary</a>
+        <a class="nav-link" href="#notebook"><span>09</span> My notebook</a>
+      </nav>
+
+      <div class="sidebar-progress">
+        <div class="mini-progress-copy">
+          <span>Your journey</span>
+          <strong id="sidebarPercent">0%</strong>
+        </div>
+        <div class="progress-track"><span id="sidebarBar"></span></div>
+        <small id="sidebarHint">Start with the mental model.</small>
+      </div>
+    </aside>
+
+    <main>
+      <section class="hero section" id="home">
+        <div class="hero-copy reveal">
+          <span class="eyebrow"><i></i> Built around your real project</span>
+          <h1>Learn the system.<br /><span>Think like an engineer.</span></h1>
+          <p>
+            Start without assumed knowledge. Build a mental model, inspect trade-offs,
+            test your memory, and practice explaining microPass like the engineer who designed it.
+          </p>
+          <div class="hero-actions">
+            <button class="primary-button" type="button" data-scroll="#system">Begin the journey <b>→</b></button>
+            <button class="secondary-button" type="button" data-scroll="#interview">Practice interview answers</button>
+          </div>
+          <div class="hero-facts">
+            <span><b>8</b> learning modules</span>
+            <span><b>16</b> flashcards</span>
+            <span><b>12</b> quiz questions</span>
+          </div>
+        </div>
+
+        <div class="hero-dashboard reveal delay-one">
+          <div class="progress-orbit">
+            <svg viewBox="0 0 140 140" role="img" aria-label="Learning progress">
+              <circle class="orbit-bg" cx="70" cy="70" r="58"></circle>
+              <circle class="orbit-value" id="progressCircle" cx="70" cy="70" r="58"></circle>
+            </svg>
+            <div><strong id="heroPercent">0%</strong><span>mastery path</span></div>
+          </div>
+          <div class="today-card">
+            <span class="card-kicker">Recommended next</span>
+            <h2 id="nextLessonTitle">Build the mental model</h2>
+            <p id="nextLessonText">Understand what microPass controls before learning individual tools.</p>
+            <button type="button" id="continueButton">Continue learning <span>↗</span></button>
+          </div>
+          <div class="streak-row">
+            <span>Reasoning loop</span>
+            <div><i class="lit"></i><i class="lit"></i><i></i><i></i><i></i></div>
+            <small>What → Why → How → Failure → Trade-off</small>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="system">
+        <div class="section-heading reveal">
+          <span class="eyebrow">The mental model</span>
+          <h2>Follow one deployment through the system</h2>
+          <p>Click each stage. Do not memorize boxes—understand what responsibility moves from one box to the next.</p>
+        </div>
+
+        <div class="journey-card reveal">
+          <div class="journey-line" aria-hidden="true"><span id="journeyProgress"></span></div>
+          <div class="journey-steps" id="journeySteps"></div>
+          <article class="journey-detail" id="journeyDetail" aria-live="polite"></article>
+        </div>
+
+        <div class="mental-grid">
+          <article class="principle-card reveal">
+            <span class="principle-number">01</span>
+            <h3>Control plane</h3>
+            <p>microPass decides what should run, records state, and asks Docker to execute workloads. It is not the deployed application itself.</p>
+          </article>
+          <article class="principle-card reveal delay-one">
+            <span class="principle-number">02</span>
+            <h3>State machine</h3>
+            <p>A deployment moves through explicit states. State makes long-running work observable, recoverable, and explainable.</p>
+          </article>
+          <article class="principle-card reveal delay-two">
+            <span class="principle-number">03</span>
+            <h3>Side effects</h3>
+            <p>Git, Docker, networks, and files live outside the database. Good engineering handles partial failure between them.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" id="lessons">
+        <div class="section-heading reveal">
+          <span class="eyebrow">Guided curriculum</span>
+          <h2>Learn from foundations to cloud thinking</h2>
+          <p>Each lesson connects theory to a concrete microPass file and ends with an explanation challenge.</p>
+        </div>
+        <div class="lesson-layout reveal">
+          <div class="lesson-list" id="lessonList" role="tablist" aria-label="Learning modules"></div>
+          <article class="lesson-content" id="lessonContent" aria-live="polite"></article>
+        </div>
+      </section>
+
+      <section class="section" id="compare">
+        <div class="section-heading reveal">
+          <span class="eyebrow">Difference lab</span>
+          <h2>Stop confusing similar concepts</h2>
+          <p>Interviewers often test boundaries: not only what a tool does, but what it does not do.</p>
+        </div>
+        <div class="compare-shell reveal">
+          <div class="compare-tabs" id="compareTabs"></div>
+          <div class="compare-content" id="compareContent"></div>
+        </div>
+      </section>
+
+      <section class="section practice-section" id="flashcards">
+        <div class="section-heading reveal">
+          <span class="eyebrow">Active recall</span>
+          <h2>Flashcards that make you retrieve, not reread</h2>
+          <p>Say your answer aloud before revealing it. Recognition feels easy; retrieval builds interview skill.</p>
+        </div>
+        <div class="flashcard-stage reveal">
+          <div class="flashcard-meta"><span id="flashCategory">Architecture</span><b id="flashCount">1 / 16</b></div>
+          <button class="flashcard" id="flashcard" type="button" aria-label="Flip flashcard">
+            <span class="flash-face flash-front">
+              <small>Question</small>
+              <strong id="flashQuestion"></strong>
+              <em>Click or press Space to reveal</em>
+            </span>
+            <span class="flash-face flash-back">
+              <small>Answer</small>
+              <strong id="flashAnswer"></strong>
+              <em id="flashTip"></em>
+            </span>
+          </button>
+          <div class="flash-controls">
+            <button class="secondary-button compact" id="flashPrev" type="button">← Previous</button>
+            <div class="confidence-buttons" aria-label="Rate your confidence">
+              <button type="button" data-confidence="again">Again</button>
+              <button type="button" data-confidence="hard">Hard</button>
+              <button type="button" data-confidence="know">I know it</button>
+            </div>
+            <button class="primary-button compact" id="flashNext" type="button">Next →</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="quiz">
+        <div class="section-heading reveal">
+          <span class="eyebrow">Knowledge check</span>
+          <h2>Reason through engineering scenarios</h2>
+          <p>The explanation matters more than the score. Wrong answers are useful when you inspect why they were tempting.</p>
+        </div>
+        <div class="quiz-shell reveal">
+          <div class="quiz-topline">
+            <span id="quizProgressText">Question 1 of 12</span>
+            <span>Score <b id="quizScore">0</b></span>
+          </div>
+          <div class="progress-track"><span id="quizBar"></span></div>
+          <article id="quizCard"></article>
+          <div class="quiz-actions">
+            <button class="secondary-button compact" id="quizReset" type="button">Restart quiz</button>
+            <button class="primary-button compact" id="quizNext" type="button" disabled>Next question →</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="interview">
+        <div class="section-heading reveal">
+          <span class="eyebrow">Interview lab</span>
+          <h2>Turn knowledge into clear engineering answers</h2>
+          <p>Use the five-part frame: context, decision, mechanism, trade-off, evidence. It prevents vague technology lists.</p>
+        </div>
+        <div class="interview-grid reveal">
+          <div class="interview-prompts">
+            <label for="interviewSelect">Choose a question</label>
+            <select id="interviewSelect"></select>
+            <div class="answer-frame" id="answerFrame"></div>
+            <button class="primary-button" id="revealAnswer" type="button">Show model answer</button>
+          </div>
+          <div class="model-answer" id="modelAnswer">
+            <div class="answer-placeholder">
+              <span>✦</span>
+              <h3>Build your answer first</h3>
+              <p>Speak for 60–90 seconds using the frame, then compare with the model response.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="glossary">
+        <div class="section-heading reveal">
+          <span class="eyebrow">Plain-language glossary</span>
+          <h2>Translate engineering vocabulary</h2>
+          <p>Search a term, then practice explaining it without using the term itself.</p>
+        </div>
+        <div class="glossary-tools reveal">
+          <input id="glossarySearch" type="search" placeholder="Search ACK, container, transaction, SSE..." aria-label="Search glossary" />
+          <span id="glossaryCount"></span>
+        </div>
+        <div class="glossary-grid" id="glossaryGrid"></div>
+      </section>
+
+      <section class="section" id="notebook">
+        <div class="section-heading reveal">
+          <span class="eyebrow">Your engineering notebook</span>
+          <h2>Knowledge becomes yours when you rewrite it</h2>
+          <p>Your notes stay in this browser using local storage. Nothing is uploaded.</p>
+        </div>
+        <div class="notebook-grid reveal">
+          <label class="note-card">
+            <span>What I understand now</span>
+            <textarea id="noteLearned" placeholder="Today I understood that RabbitMQ..."></textarea>
+          </label>
+          <label class="note-card">
+            <span>What is still unclear</span>
+            <textarea id="noteUnclear" placeholder="I still cannot explain why..."></textarea>
+          </label>
+          <label class="note-card wide">
+            <span>Explain microPass in my own words</span>
+            <textarea id="noteExplanation" placeholder="microPass is a control plane that..."></textarea>
+          </label>
+        </div>
+        <div class="notebook-footer reveal">
+          <span id="noteStatus">Notes save automatically.</span>
+          <button class="danger-button" id="resetProgress" type="button">Reset academy progress</button>
+        </div>
+      </section>
+
+      <footer>
+        <p>Built for deliberate practice inside the microPass project.</p>
+        <p><kbd>Space</kbd> flips cards · <kbd>←</kbd><kbd>→</kbd> navigates them</p>
+      </footer>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
