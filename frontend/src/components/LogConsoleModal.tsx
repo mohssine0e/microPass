@@ -1,7 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { X, Terminal, Copy, Check, Ban, Loader2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowDown, Ban, Check, Copy, Loader2, Radio, Terminal, X } from 'lucide-react';
 import { cancelDeployment, getStreamUrl } from '../api';
-import { DeploymentStatus } from '../types';
+import type { DeploymentStatus } from '../types';
+import { getStatusLabel, getStatusTone } from '../status';
+import { useDialogFocus } from '../dialogFocus';
 
 interface LogConsoleModalProps {
   deploymentId: number;
@@ -11,13 +13,13 @@ interface LogConsoleModalProps {
   onStatusChange?: (status: DeploymentStatus) => void;
 }
 
-export const LogConsoleModal: React.FC<LogConsoleModalProps> = ({
+export function LogConsoleModal({
   deploymentId,
   appName,
   initialStatus,
   onClose,
   onStatusChange,
-}) => {
+}: LogConsoleModalProps) {
   const [logs, setLogs] = useState<string[]>([]);
   const [status, setStatus] = useState<DeploymentStatus>(initialStatus);
   const [copied, setCopied] = useState(false);
@@ -25,26 +27,36 @@ export const LogConsoleModal: React.FC<LogConsoleModalProps> = ({
   const [autoScroll, setAutoScroll] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  useDialogFocus(dialogRef, closeButtonRef);
 
-  const isTerminalState =
-    status === 'HEALTHY' ||
-    status === 'FAILED' ||
-    status === 'CANCELLED' ||
-    status === 'STOPPED';
+  const isTerminalState = ['HEALTHY', 'FAILED', 'CANCELLED', 'STOPPED'].includes(status);
+  const statusTone = getStatusTone(status, status === 'HEALTHY');
 
   useEffect(() => {
     setStatus(initialStatus);
   }, [initialStatus]);
 
   useEffect(() => {
-    const streamUrl = getStreamUrl(deploymentId);
-    const es = new EventSource(streamUrl);
-    eventSourceRef.current = es;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose]);
 
-    es.onmessage = (event) => {
+  useEffect(() => {
+    const eventSource = new EventSource(getStreamUrl(deploymentId));
+
+    eventSource.onmessage = (event) => {
       const line = event.data;
-      setLogs((prev) => [...prev, line]);
+      setLogs((previous) => [...previous, line]);
 
       if (line.includes('Deployment SUCCESS') || line.includes('Readiness probe PASSED')) {
         setStatus('HEALTHY');
@@ -64,17 +76,17 @@ export const LogConsoleModal: React.FC<LogConsoleModalProps> = ({
         setStatus(finalStatus);
         onStatusChange?.(finalStatus);
       }
-      es.close();
+      eventSource.close();
     };
-    es.addEventListener('complete', handleComplete);
 
-    es.onerror = () => {
-      // EventSource automatically retries unless closed
+    eventSource.addEventListener('complete', handleComplete);
+    eventSource.onerror = () => {
+      // EventSource retries transient failures until the named completion event closes it.
     };
 
     return () => {
-      es.removeEventListener('complete', handleComplete);
-      es.close();
+      eventSource.removeEventListener('complete', handleComplete);
+      eventSource.close();
     };
   }, [deploymentId, onStatusChange]);
 
@@ -82,12 +94,16 @@ export const LogConsoleModal: React.FC<LogConsoleModalProps> = ({
     if (autoScroll && terminalRef.current) {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
     }
-  }, [logs, autoScroll]);
+  }, [autoScroll, logs]);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(logs.join('\n'));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(logs.join('\n'));
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setError('The browser could not copy the console output.');
+    }
   };
 
   const handleCancel = async () => {
@@ -97,128 +113,110 @@ export const LogConsoleModal: React.FC<LogConsoleModalProps> = ({
       await cancelDeployment(deploymentId);
       setStatus('CANCELLED');
       onStatusChange?.('CANCELLED');
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to cancel deployment');
+    } catch (caught: unknown) {
+      setError(caught instanceof Error ? caught.message : 'Failed to cancel deployment');
     } finally {
       setCancelling(false);
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-4xl max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
-        {/* Modal Header */}
-        <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/60">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 rounded-lg bg-slate-800 text-cyan-400 border border-slate-700">
-              <Terminal className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-white tracking-wide">Deployment Console</h3>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono border border-slate-700">
-                  #{deploymentId}
-                </span>
-                <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
-                  status === 'HEALTHY' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                  status === 'FAILED' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
-                  status === 'CANCELLED' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                  'bg-blue-500/10 text-blue-400 border border-blue-500/20 animate-pulse'
-                }`}>
-                  {status}
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 mt-0.5">Application: <span className="text-slate-200 font-medium">{appName}</span></p>
-            </div>
-          </div>
+  const jumpToLatest = () => {
+    setAutoScroll(true);
+    if (terminalRef.current) terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+  };
 
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={handleCopy}
-              className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition"
-              title="Copy all logs"
-            >
-              {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+  return (
+    <div className="modal-backdrop console-backdrop" role="presentation">
+      <section ref={dialogRef} className="modal-shell console-modal" role="dialog" aria-modal="true" aria-labelledby="console-title">
+        <header className="console-header">
+          <div className="console-title">
+            <span className="console-title__mark"><Terminal className="h-5 w-5" /></span>
+            <div>
+              <span>Live deployment output</span>
+              <h2 id="console-title">{appName}</h2>
+            </div>
+            <code>run #{deploymentId}</code>
+          </div>
+          <div className="console-header__actions">
+            <span className={`status-pill status-pill--${statusTone}`}>
+              {!isTerminalState && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {isTerminalState && <i />}
+              {getStatusLabel(status, status === 'HEALTHY')}
+            </span>
+            <button type="button" onClick={() => void handleCopy()} className="modal-icon-button" title="Copy all output">
+              {copied ? <Check className="h-4 w-4 text-emerald-300" /> : <Copy className="h-4 w-4" />}
             </button>
-            <button
-              onClick={onClose}
-              className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition"
-            >
-              <X className="h-5 w-5" />
+            <button ref={closeButtonRef} type="button" onClick={onClose} className="modal-icon-button" aria-label="Close console">
+              <X className="h-4 w-4" />
             </button>
           </div>
+        </header>
+
+        <div className="console-toolbar">
+          <div>
+            <span className={`console-stream-state ${isTerminalState ? 'is-complete' : ''}`}><i />
+              {isTerminalState ? 'Stream complete' : 'Streaming stdout and stderr'}
+            </span>
+            <span>{logs.length} {logs.length === 1 ? 'line' : 'lines'}</span>
+          </div>
+          <button type="button" onClick={jumpToLatest} className={autoScroll ? 'is-active' : ''}>
+            <ArrowDown className="h-3.5 w-3.5" /> Follow latest
+          </button>
         </div>
 
-        {/* Terminal Body */}
         <div
           ref={terminalRef}
-          onScroll={(e) => {
-            const target = e.currentTarget;
-            const atBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 50;
-            setAutoScroll(atBottom);
+          onScroll={(event) => {
+            const target = event.currentTarget;
+            setAutoScroll(target.scrollHeight - target.scrollTop <= target.clientHeight + 50);
           }}
-          className="flex-1 p-4 bg-black/90 font-mono text-xs overflow-y-auto leading-relaxed select-text space-y-1 min-h-[380px]"
+          className="deployment-console"
+          aria-live="polite"
         >
           {logs.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-slate-500 space-x-2 py-12">
-              <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
-              <span>Connecting to live build stream...</span>
+            <div className="console-waiting">
+              <span><Radio className="h-5 w-5" /></span>
+              <strong>Connecting to the deployment stream</strong>
+              <p>Historical output is replayed first, then new lines arrive live.</p>
             </div>
           ) : (
-            logs.map((line, idx) => {
-              const isError = line.includes('[ERROR]') || line.includes('failed') || line.includes('Fatal');
-              const isSuccess = line.includes('SUCCESS') || line.includes('PASSED') || line.includes('complete');
+            logs.map((line, index) => {
+              const normalized = line.toLowerCase();
+              const isError = line.includes('[ERROR]') || normalized.includes('failed') || normalized.includes('fatal');
+              const isSuccess = line.includes('SUCCESS') || line.includes('PASSED') || normalized.includes('complete');
               const isInfo = line.startsWith('>>>') || line.startsWith('===');
               const isCancel = line.includes('[CANCEL]');
-
-              let color = 'text-slate-300';
-              if (isError) color = 'text-rose-400';
-              else if (isSuccess) color = 'text-emerald-400 font-semibold';
-              else if (isCancel) color = 'text-amber-400 font-semibold';
-              else if (isInfo) color = 'text-cyan-400 font-medium';
-
+              const tone = isError ? 'error' : isSuccess ? 'success' : isCancel ? 'warning' : isInfo ? 'info' : 'default';
               return (
-                <div key={idx} className={`whitespace-pre-wrap break-all ${color}`}>
-                  {line}
+                <div key={`${index}-${line.slice(0, 12)}`} className={`console-line console-line--${tone}`}>
+                  <span>{String(index + 1).padStart(3, '0')}</span>
+                  <code>{line}</code>
                 </div>
               );
             })
           )}
         </div>
 
-        {/* Modal Footer */}
-        {error && (
-          <div className="border-t border-rose-500/20 bg-rose-500/10 px-5 py-2 text-xs text-rose-300" role="alert">
-            {error}
-          </div>
-        )}
-        <div className="px-5 py-3 border-t border-slate-800 bg-slate-900/90 flex items-center justify-between text-xs">
-          <div className="flex items-center space-x-2 text-slate-400">
-            <span className={`h-2 w-2 rounded-full ${isTerminalState ? 'bg-slate-500' : 'bg-emerald-400 animate-pulse'}`} />
-            <span>{isTerminalState ? 'Process finished' : 'Streaming live stdout / stderr'}</span>
-          </div>
+        {error && <div className="console-error" role="alert">{error}</div>}
 
-          <div className="flex items-center space-x-3">
+        <footer className="console-footer">
+          <div>
+            <strong>{isTerminalState ? 'Deployment process finished' : 'The pipeline continues if you close this window'}</strong>
+            <span>{isTerminalState ? 'Review the output, then return to the dashboard.' : 'Closing the console does not cancel work.'}</span>
+          </div>
+          <div>
             {!isTerminalState && (
-              <button
-                onClick={handleCancel}
-                disabled={cancelling}
-                className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-medium transition disabled:opacity-50"
-              >
-                {cancelling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Ban className="h-3.5 w-3.5" />}
-                <span>Cancel Build</span>
+              <button type="button" onClick={() => void handleCancel()} disabled={cancelling} className="button button--danger">
+                {cancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />}
+                Cancel deployment
               </button>
             )}
-
-            <button
-              onClick={onClose}
-              className="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium transition"
-            >
-              {isTerminalState ? 'Close Console' : 'Close Console (Keeps running)'}
+            <button type="button" onClick={onClose} className="button button--secondary">
+              {isTerminalState ? 'Close console' : 'Close and keep running'}
             </button>
           </div>
-        </div>
-      </div>
+        </footer>
+      </section>
     </div>
   );
-};
+}
