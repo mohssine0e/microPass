@@ -73,6 +73,7 @@ export function App() {
             latestDeployment: latest || undefined,
             running: status.running,
             allocatedPort: status.allocatedPort || app.allocatedPort,
+            stableUrl: status.stableUrl,
           };
         }),
       );

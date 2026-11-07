@@ -20,7 +20,7 @@ export async function fetchApps(): Promise<App[]> {
   return res.json();
 }
 
-export async function fetchAppStatus(id: number): Promise<{ running: boolean; allocatedPort?: number; activeContainerId?: string }> {
+export async function fetchAppStatus(id: number): Promise<{ running: boolean; allocatedPort?: number; activeContainerId?: string; stableUrl?: string }> {
   const res = await fetch(`${API_BASE}/apps/${id}/status`);
   if (!res.ok) throw new Error(await errorMessage(res, 'Failed to read application runtime status'));
   return res.json();

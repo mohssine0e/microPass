@@ -86,11 +86,11 @@ export function AppCard({ app, onOpenLogs, onRefresh, onError }: AppCardProps) {
               <h3>{app.name}</h3>
               {app.allocatedPort && app.running && (
                 <a
-                  href={`http://${liveHost}:${app.allocatedPort}`}
+                  href={app.stableUrl || `http://${liveHost}:${app.allocatedPort}`}
                   target="_blank"
                   rel="noreferrer"
                   className="live-link"
-                  title="Open running application"
+                  title={app.stableUrl ? `Open stable URL: ${app.stableUrl}` : 'Open running application'}
                 >
                   Open <ArrowUpRight className="h-3.5 w-3.5" />
                 </a>
@@ -129,8 +129,12 @@ export function AppCard({ app, onOpenLogs, onRefresh, onError }: AppCardProps) {
         </div>
         <div className="application-fact">
           <span><Network className="h-3.5 w-3.5" />Routing</span>
-          <strong>
-            {app.allocatedPort ? `:${app.allocatedPort}` : 'Unassigned'}
+          <strong title={app.stableUrl || undefined}>
+            {app.stableUrl ? (
+              <a href={app.stableUrl} target="_blank" rel="noreferrer">
+                {new URL(app.stableUrl).host}
+              </a>
+            ) : app.allocatedPort ? `:${app.allocatedPort}` : 'Unassigned'}
             <small> → :{app.targetPort || 80}</small>
           </strong>
         </div>

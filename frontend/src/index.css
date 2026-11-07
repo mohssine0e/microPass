@@ -214,6 +214,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .application-fact > span { display: flex; align-items: center; gap: 5px; color: var(--faint); font-size: 7px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .application-fact > span svg { color: var(--blue); }
 .application-fact > strong { display: block; margin-top: 6px; overflow: hidden; color: var(--text-soft); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.application-fact > strong a { color: var(--mint); text-decoration: none; }
+.application-fact > strong a:hover { text-decoration: underline; }
 .application-fact > strong small { color: var(--faint); font-size: 8px; font-weight: 600; }
 .application-fact > strong.is-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .application-card__deployment { min-height: 38px; padding: 8px 0 13px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }

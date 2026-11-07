@@ -20,6 +20,7 @@ export interface App {
   createdAt?: string;
   latestDeployment?: Deployment;
   running?: boolean;
+  stableUrl?: string;
 }
 
 export interface Deployment {
@@ -42,4 +43,3 @@ export interface CreateAppForm {
   dockerfilePath: string;
   targetPort: number;
 }
-
