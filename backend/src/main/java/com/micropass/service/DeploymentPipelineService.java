@@ -40,6 +40,7 @@ public class DeploymentPipelineService {
     private final LogStreamService logStreamService;
     private final HealthCheckService healthCheckService;
     private final RabbitTemplate rabbitTemplate;
+    private final ProxyRoutingService proxyRoutingService;
 
     // Active cancellation flags and process handles for instant killing
     private final Map<Long, AtomicBoolean> activeCancellations = new ConcurrentHashMap<>();
@@ -55,7 +56,8 @@ public class DeploymentPipelineService {
             PortAllocationService portAllocationService,
             LogStreamService logStreamService,
             HealthCheckService healthCheckService,
-            RabbitTemplate rabbitTemplate) {
+            RabbitTemplate rabbitTemplate,
+            ProxyRoutingService proxyRoutingService) {
         this.appRepository = appRepository;
         this.deploymentRepository = deploymentRepository;
         this.workspaceService = workspaceService;
@@ -65,6 +67,7 @@ public class DeploymentPipelineService {
         this.logStreamService = logStreamService;
         this.healthCheckService = healthCheckService;
         this.rabbitTemplate = rabbitTemplate;
+        this.proxyRoutingService = proxyRoutingService;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -189,6 +192,7 @@ public class DeploymentPipelineService {
         }
 
         String activeContainerId = app.getActiveContainerId();
+        proxyRoutingService.deactivate(app.getId());
         String containerNameOrId = activeContainerId != null && !activeContainerId.isBlank()
                 ? activeContainerId
                 : "micropass-" + app.getName();
@@ -237,6 +241,9 @@ public class DeploymentPipelineService {
         String candidateContainerId = null;
         boolean ownsDeployment = false;
         boolean candidatePromoted = false;
+        boolean routeChanged = false;
+        Integer previousPort = null;
+        String previousActiveContainerId = null;
 
         try {
             int claimed = deploymentRepository.transitionStatus(
@@ -358,6 +365,10 @@ public class DeploymentPipelineService {
             transitionStatus(deployment, DeploymentStatus.DEPLOYING, DeploymentStatus.HEALTHY);
 
             String previousContainerId = app.getActiveContainerId();
+            previousActiveContainerId = previousContainerId;
+            previousPort = app.getAllocatedPort();
+            proxyRoutingService.activate(app.getId(), hostPort);
+            routeChanged = proxyRoutingService.isEnabled();
             app.setActiveContainerId(candidateContainerId);
             app.setAllocatedPort(hostPort);
             appRepository.save(app);
@@ -371,12 +382,24 @@ public class DeploymentPipelineService {
             deployment.setFinishedAt(LocalDateTime.now());
 
             autoLog(deployment, logBuffer, "==========================================================");
-            autoLog(deployment, logBuffer, "🎉 Deployment SUCCESS! Application live at http://localhost:" + hostPort);
+            String publicUrl = proxyRoutingService.urlFor(app);
+            autoLog(deployment, logBuffer, "🎉 Deployment SUCCESS! Application live at "
+                    + (publicUrl != null ? publicUrl : "http://localhost:" + hostPort));
             autoLog(deployment, logBuffer, "==========================================================");
             deployment.setBuildLogs(logBuffer.toString());
             deploymentRepository.save(deployment);
 
         } catch (Exception e) {
+            if (routeChanged && !candidatePromoted && app != null) {
+                app.setActiveContainerId(previousActiveContainerId);
+                app.setAllocatedPort(previousPort);
+                try {
+                    if (previousPort == null) proxyRoutingService.deactivate(app.getId());
+                    else proxyRoutingService.activate(app.getId(), previousPort);
+                } catch (Exception rollbackError) {
+                    log.error("Could not restore previous proxy route for app #{}", appId, rollbackError);
+                }
+            }
             if (!candidatePromoted && candidateContainerId != null) {
                 dockerService.stopAndRemoveContainer(candidateContainerId, null);
             } else if (!candidatePromoted && candidateContainerName != null) {

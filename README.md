@@ -20,6 +20,7 @@ together.
 - Git synchronization with incremental cache, timeout, cancellation, and process-tree cleanup
 - Docker builds and resource-limited candidate containers
 - HTTP readiness checks before replacing the previous healthy container
+- Optional stable local URLs through Caddy after candidate readiness
 - Live logs over Server-Sent Events with bounded replay and terminal events
 - Unit tests, PostgreSQL Testcontainers integration testing, and GitHub Actions CI
 
@@ -174,6 +175,34 @@ QUEUED → CLONING → BUILDING → DEPLOYING → HEALTHY
 The application card will show the allocated host port in the configured range
 `9100–9200`.
 
+### Optional stable local URLs
+
+Start the Caddy proxy alongside PostgreSQL and RabbitMQ:
+
+```bash
+docker compose up -d postgres rabbitmq proxy
+```
+
+Run microPass with `MICROPASS_PROXY_ENABLED=true`. For example:
+
+```bash
+MICROPASS_PROXY_ENABLED=true SPRING_PROFILES_ACTIVE=postgres \
+java -jar backend/target/micropass-0.0.1-SNAPSHOT.jar
+```
+
+Each running application then has a stable local URL such as
+`http://app-1.localhost:9080/`. The numeric ID keeps the address unique even if
+an application name contains underscores or a deleted name is reused. The
+dashboard's **Open** link uses this URL when the proxy is enabled. Candidate
+containers still receive temporary host ports for readiness checks. Caddy
+switches the stable route only after the candidate passes readiness; a failed
+candidate leaves the old route in place. Direct host ports remain available.
+
+The `.localhost` address is for browsers on the same machine as microPass.
+This local HTTP route does not add TLS, public DNS, or access control. Caddy's
+admin API is published only on host loopback port `2019`. If enabled, microPass
+requires that API during startup and route changes.
+
 ## REST API
 
 | Method | Endpoint | Purpose |
@@ -257,7 +286,7 @@ multi-tenant service.
 
 - No authentication, authorization, tenant isolation, TLS, domains, or secret store
 - Repository code and Dockerfiles must be trusted; Docker daemon access is effectively host-level control
-- No reverse proxy, so successful replacements may receive a different host port; this is safe replacement, not a stable-URL zero-downtime deployment
+- Stable URLs require the optional local Caddy proxy; direct host-port URLs can still change on replacement
 - One worker consumes one deployment at a time; locks and SSE buffers are in one JVM
 - Database creation and RabbitMQ publication form a dual write; a transactional outbox is a future reliability improvement
 - Port probing cannot reserve a socket atomically through the later `docker run`; the single worker greatly reduces but does not mathematically eliminate that race

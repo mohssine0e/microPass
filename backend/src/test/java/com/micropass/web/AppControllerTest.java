@@ -7,6 +7,7 @@ import com.micropass.service.DeploymentPipelineService;
 import com.micropass.service.DockerService;
 import com.micropass.service.GitService;
 import com.micropass.service.LogStreamService;
+import com.micropass.service.ProxyRoutingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -32,7 +33,8 @@ class AppControllerTest {
                 mock(DeploymentPipelineService.class),
                 mock(LogStreamService.class),
                 mock(DockerService.class),
-                mock(GitService.class));
+                mock(GitService.class),
+                mock(ProxyRoutingService.class));
     }
 
     @Test

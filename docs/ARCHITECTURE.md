@@ -14,7 +14,7 @@ The v0.1 boundary is intentionally narrow:
 - one PostgreSQL database;
 - one Docker daemon;
 - trusted operator and trusted repositories;
-- direct host-port access instead of domains or a reverse proxy.
+- direct host-port access, with optional Caddy routing for stable local URLs.
 
 This boundary makes the system small enough to understand while still exposing
 real distributed-systems problems: durable hand-off, duplicate delivery, dual
@@ -191,7 +191,7 @@ This is correct for the documented single-JVM scope. Multiple microPass replicas
 would need database-backed admission control and distributed coordination rather
 than relying on JVM synchronization and in-memory locks.
 
-## Safe replacement, not stable-URL zero downtime
+## Safe replacement and optional stable local routing
 
 ```mermaid
 flowchart LR
@@ -203,10 +203,12 @@ flowchart LR
     Promote --> Retire[Remove old container]
 ```
 
-The new candidate generally uses another host port. Without a reverse proxy,
-there is no stable domain or port that automatically switches traffic. The
-design prevents a bad revision from destroying the known-good container; it
-does not yet provide proxy-based blue/green routing.
+The new candidate generally uses another host port. When the optional Caddy
+proxy is enabled, microPass changes the app's `.localhost:9080` route only
+after the candidate passes readiness. A route update failure fails the new
+deployment and keeps the previous container. Without the proxy, the direct
+host port can change on replacement. These local HTTP routes do not provide
+public DNS, TLS, or multi-host routing.
 
 ## Logs and SSE lifecycle
 
@@ -276,3 +278,4 @@ and a carefully designed build execution boundary.
 - [ADR 03 — PostgreSQL and Flyway](decisions/03-postgresql-and-flyway.md)
 - [ADR 04 — SSE for deployment logs](decisions/04-sse-for-deployment-logs.md)
 - [ADR 05 — Health-checked candidate replacement](decisions/05-health-checked-candidate-replacement.md)
+- [ADR 06 — Stable local routing with Caddy](decisions/06-stable-local-routing.md)

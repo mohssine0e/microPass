@@ -7,6 +7,7 @@ import com.micropass.domain.DeploymentRepository;
 import com.micropass.service.DeploymentPipelineService;
 import com.micropass.service.DockerService;
 import com.micropass.service.LogStreamService;
+import com.micropass.service.ProxyRoutingService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -33,6 +34,7 @@ public class AppController {
     private final LogStreamService logStreamService;
     private final DockerService dockerService;
     private final com.micropass.service.GitService gitService;
+    private final ProxyRoutingService proxyRoutingService;
 
     public AppController(
             AppRepository appRepository,
@@ -40,13 +42,15 @@ public class AppController {
             DeploymentPipelineService pipelineService,
             LogStreamService logStreamService,
             DockerService dockerService,
-            com.micropass.service.GitService gitService) {
+            com.micropass.service.GitService gitService,
+            ProxyRoutingService proxyRoutingService) {
         this.appRepository = appRepository;
         this.deploymentRepository = deploymentRepository;
         this.pipelineService = pipelineService;
         this.logStreamService = logStreamService;
         this.dockerService = dockerService;
         this.gitService = gitService;
+        this.proxyRoutingService = proxyRoutingService;
     }
 
     public record CreateAppRequest(
@@ -137,12 +141,14 @@ public class AppController {
                     ? app.getActiveContainerId()
                     : "micropass-" + app.getName();
             boolean isRunning = dockerService.isContainerRunning(containerNameOrId);
+            String stableUrl = isRunning ? proxyRoutingService.urlFor(app) : null;
             return ResponseEntity.ok(Map.<String, Object>of(
                     "appId", app.getId(),
                     "name", app.getName(),
                     "running", isRunning,
                     "allocatedPort", app.getAllocatedPort() != null ? app.getAllocatedPort() : 0,
-                    "activeContainerId", app.getActiveContainerId() != null ? app.getActiveContainerId() : ""
+                    "activeContainerId", app.getActiveContainerId() != null ? app.getActiveContainerId() : "",
+                    "stableUrl", stableUrl != null ? stableUrl : ""
             ));
         }).orElse(ResponseEntity.notFound().build());
     }

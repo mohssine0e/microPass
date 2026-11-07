@@ -33,5 +33,22 @@ services:
       retries: 10
     restart: unless-stopped
 
+  proxy:
+    image: caddy:2-alpine
+    container_name: micropass-proxy
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile", "--resume"]
+    ports:
+      - "9080:9080"
+      - "127.0.0.1:2019:2019"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - micropass-proxy-config:/config
+      - micropass-proxy-data:/data
+    restart: unless-stopped
+
 volumes:
   micropass-postgres-data:
+  micropass-proxy-config:
+  micropass-proxy-data:

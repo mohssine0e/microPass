@@ -132,8 +132,9 @@ be made atomic with a database transaction by magic.
 
 The previous implementation removed the old container before knowing whether the
 replacement was healthy. v0.1 uses a unique candidate container and only switches
-the active application record after readiness succeeds. This is safe replacement,
-not yet stable-URL zero downtime; a reverse proxy is a future phase.
+the active application record after readiness succeeds. At the v0.1 milestone,
+direct host-port links could still change. Optional local Caddy routing was added
+later; see [ADR 06](decisions/06-stable-local-routing.md).
 Queued cancellation now closes SSE immediately, stop/delete reject active work,
 and stop marks the deployment that owns the actual running container even if a
 newer deployment failed. API and Docker layers both enforce workspace-relative

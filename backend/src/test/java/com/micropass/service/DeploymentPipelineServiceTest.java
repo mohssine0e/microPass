@@ -11,6 +11,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.util.Optional;
 import java.time.LocalDateTime;
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -34,6 +35,7 @@ class DeploymentPipelineServiceTest {
     private LogStreamService logStreamService;
     private HealthCheckService healthCheckService;
     private RabbitTemplate rabbitTemplate;
+    private ProxyRoutingService proxyRoutingService;
     private DeploymentPipelineService service;
 
     @BeforeEach
@@ -47,6 +49,7 @@ class DeploymentPipelineServiceTest {
         logStreamService = mock(LogStreamService.class);
         healthCheckService = mock(HealthCheckService.class);
         rabbitTemplate = mock(RabbitTemplate.class);
+        proxyRoutingService = mock(ProxyRoutingService.class);
         service = new DeploymentPipelineService(
                 appRepository,
                 deploymentRepository,
@@ -56,7 +59,8 @@ class DeploymentPipelineServiceTest {
                 portAllocationService,
                 logStreamService,
                 healthCheckService,
-                rabbitTemplate);
+                rabbitTemplate,
+                proxyRoutingService);
     }
 
     @Test
@@ -83,6 +87,38 @@ class DeploymentPipelineServiceTest {
                 21L, DeploymentStatus.QUEUED, DeploymentStatus.CLONING);
         verify(appRepository, never()).findById(any());
         verifyNoInteractions(gitService, dockerService, portAllocationService, healthCheckService);
+    }
+
+    @Test
+    void runPipeline_restoresOldRouteIfAppPromotionCannotBeSaved() {
+        App app = app(7L, "old-container");
+        app.setAllocatedPort(9100);
+        Deployment deployment = Deployment.builder().id(21L).app(app).status(DeploymentStatus.QUEUED).build();
+        when(deploymentRepository.transitionStatus(eq(21L), any(), any())).thenReturn(1);
+        when(appRepository.findById(7L)).thenReturn(Optional.of(app));
+        when(deploymentRepository.findById(21L)).thenReturn(Optional.of(deployment));
+        when(workspaceService.prepareWorkspace(7L, 21L)).thenReturn(Path.of("/tmp/micropass-test-workspace"));
+        when(gitService.cloneRepository(any(), any(), any(), any(), any(), any()))
+                .thenReturn(new GitService.GitResult(true, "abc123", null));
+        when(dockerService.buildImage(any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(new DockerService.DockerBuildResult(true, "micropass-demo:abc123", ""));
+        when(portAllocationService.allocatePort(app)).thenReturn(9101);
+        when(dockerService.runContainer(any(), any(), eq(9101), eq(80), any()))
+                .thenReturn(new DockerService.DockerRunResult(true, "candidate-container", ""));
+        when(healthCheckService.waitForHealthy(eq(9101), eq(12), any(), any(), any()))
+                .thenReturn(true);
+        when(proxyRoutingService.isEnabled()).thenReturn(true);
+        when(appRepository.save(app)).thenThrow(new IllegalStateException("database unavailable"));
+
+        service.runPipeline(7L, 21L);
+
+        org.mockito.InOrder routes = org.mockito.Mockito.inOrder(proxyRoutingService);
+        routes.verify(proxyRoutingService).activate(7L, 9101);
+        routes.verify(proxyRoutingService).activate(7L, 9100);
+        assertThat(app.getActiveContainerId()).isEqualTo("old-container");
+        assertThat(app.getAllocatedPort()).isEqualTo(9100);
+        assertThat(deployment.getStatus()).isEqualTo(DeploymentStatus.FAILED);
+        verify(dockerService).stopAndRemoveContainer("candidate-container", null);
     }
 
     @Test
